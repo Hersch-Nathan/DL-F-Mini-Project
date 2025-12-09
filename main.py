@@ -1,11 +1,11 @@
-# Main File
+# Main training and evaluation script
 # EE599 - Deep Learning Fundamentals
-# Hersch Nathan 
-# Last Modified 12/07/25
+# Hersch Nathan
 
 import numpy as np
 import torch
 import time
+import os
 from torch.utils.data import TensorDataset, DataLoader, random_split
 
 from src.config import RRR_dh, RRRRRR_dh, NUM_SAMPLES, RRR_SEED, RRRRRR_SEED, TEST_SPLIT, GENERATE_RRR_DATASET, GENERATE_RRRRRR_DATASET
@@ -14,199 +14,206 @@ from src.training import generate_dataset, generate_consistent_dataset, save_dat
 from src.models import Simple4Layer, SimpleCNN, Simple4Layer6DOF, SimpleCNN6DOF
 from src.evaluation import evaluate_model
 
+# Create models directory if it doesn't exist
+os.makedirs('models', exist_ok=True)
+
+def prepare_dataset(angles, pos, orient, dh_params):
+    """Prepare dataset for training/testing."""
+    dh_repeat = np.tile(dh_params, (len(pos), 1))
+    inputs = torch.tensor(np.concatenate([pos, orient, dh_repeat], axis=1), dtype=torch.float32)
+    outputs = torch.tensor(angles, dtype=torch.float32)
+    dataset = TensorDataset(inputs, outputs)
+    train_idx = int(0.8 * len(dataset))
+    train, test = random_split(dataset, [train_idx, len(dataset) - train_idx])
+    return (DataLoader(train, batch_size=64, shuffle=True),
+            DataLoader(test, batch_size=64, shuffle=False))
+
 def main():
+    """Main training and evaluation pipeline."""
+    # Generate datasets if needed
     if GENERATE_RRR_DATASET:
-        print("Generating RRR random dataset (angles +-180)")
-        rrr_angles_random, rrr_pos_random, rrr_orient_random = generate_dataset(
-            RRR_dh, 
-            num_samples=NUM_SAMPLES, 
-            angle_min=-180, 
-            angle_max=180, 
-            seed=RRR_SEED
+        print("Generating RRR datasets...")
+        angles_rand, pos_rand, orient_rand = generate_dataset(
+            RRR_dh, num_samples=NUM_SAMPLES, angle_min=-180, angle_max=180, seed=RRR_SEED
         )
-        save_dataset('data/rrr_dataset_random.npz', rrr_angles_random, rrr_pos_random, rrr_orient_random)
-        print(f"RRR random dataset saved: {len(rrr_angles_random)} samples")
+        save_dataset('data/rrr_dataset_random.npz', angles_rand, pos_rand, orient_rand)
         
-        print("\nGenerating RRR consistent dataset (angles +-90)")
-        rrr_angles, rrr_pos, rrr_orient = generate_dataset(
-            RRR_dh, 
-            num_samples=NUM_SAMPLES, 
-            angle_min=-90, 
-            angle_max=90, 
-            seed=RRR_SEED
+        angles, pos, orient = generate_dataset(
+            RRR_dh, num_samples=NUM_SAMPLES, angle_min=-90, angle_max=90, seed=RRR_SEED
         )
-        save_dataset('data/rrr_dataset.npz', rrr_angles, rrr_pos, rrr_orient)
-        print(f"RRR consistent dataset saved: {len(rrr_angles)} samples")
+        save_dataset('data/rrr_dataset.npz', angles, pos, orient)
     
     if GENERATE_RRRRRR_DATASET:
-        print("Generating RRRRRR dataset with consistent solutions")
-        rrrrrr_angles, rrrrrr_pos, rrrrrr_orient = generate_consistent_dataset(
-            RRRRRR_dh, 
-            num_samples=NUM_SAMPLES, 
-            angle_min=-90, 
-            angle_max=90, 
-            seed=RRRRRR_SEED
+        print("Generating 6-DOF dataset...")
+        angles, pos, orient = generate_consistent_dataset(
+            RRRRRR_dh, num_samples=NUM_SAMPLES, angle_min=-90, angle_max=90, seed=RRRRRR_SEED
         )
-        save_dataset('data/rrrrrr_dataset.npz', rrrrrr_angles, rrrrrr_pos, rrrrrr_orient)
-        print(f"RRRRRR dataset saved: {len(rrrrrr_angles)} samples with consistent solutions")
+        save_dataset('data/rrrrrr_dataset.npz', angles, pos, orient)
     
-    print("\nLoading datasets with torch...")
+    print("Loading datasets...\n")
     
-    # Load random dataset (for demonstrating the problem)
-    print("\n--- Random Dataset (Multiple IK Solutions) ---")
-    rrr_angles_random, rrr_pos_random, rrr_orient_random = load_dataset('data/rrr_dataset_random.npz')
+    # Setup 3-DOF RRR
+    print("="*70)
+    print("3-DOF RRR ROBOT")
+    print("="*70)
     
-    dh_rad = deg_to_rad_dh(RRR_dh)
-    dh_params = dh_rad[:, :3].flatten()
-    dh_params_repeated_random = np.tile(dh_params, (len(rrr_pos_random), 1))
+    dh_rad_rrr = deg_to_rad_dh(RRR_dh)
+    dh_params_rrr = dh_rad_rrr[:, :3].flatten()
     
-    rrr_inputs_raw_random = np.concatenate([rrr_pos_random, rrr_orient_random, dh_params_repeated_random], axis=1)
-    rrr_inputs_random = torch.tensor(rrr_inputs_raw_random, dtype=torch.float32)
-    rrr_outputs_random = torch.tensor(rrr_angles_random, dtype=torch.float32)
-    rrr_dataset_random = TensorDataset(rrr_inputs_random, rrr_outputs_random)
+    # Load random dataset (multiple IK solutions)
+    angles_rand, pos_rand, orient_rand = load_dataset('data/rrr_dataset_random.npz')
+    loader_train_rand, loader_test_rand = prepare_dataset(angles_rand, pos_rand, orient_rand, dh_params_rrr)
     
-    test_size = int(TEST_SPLIT * len(rrr_dataset_random))
-    train_size = len(rrr_dataset_random) - test_size
-    rrr_train_random, rrr_test_random = random_split(rrr_dataset_random, [train_size, test_size])
-    print(f"RRR Random: {len(rrr_train_random)} train, {len(rrr_test_random)} test")
+    # Load consistent dataset (unique IK solutions)
+    angles_rrr, pos_rrr, orient_rrr = load_dataset('data/rrr_dataset.npz')
+    loader_train_rrr, loader_test_rrr = prepare_dataset(angles_rrr, pos_rrr, orient_rrr, dh_params_rrr)
     
-    # Load consistent dataset (for demonstrating the solution)
-    print("\n--- Consistent Dataset (Unique IK Solutions) ---")
-    rrr_angles_load, rrr_pos_load, rrr_orient_load = load_dataset('data/rrr_dataset.npz')
+    # Train on random dataset at 0.5 rad precision
+    print("\n1. Training Simple4Layer on RANDOM dataset (0.5 rad precision)")
+    model_rrr_fc_rand = Simple4Layer(input_size=15)
+    model_rrr_fc_rand = train_model(model_rrr_fc_rand, loader_train_rand, loader_test_rand, 
+                                     epochs=100, lr=0.001, accuracy_threshold=0.5)
+    torch.save(model_rrr_fc_rand.state_dict(), 'models/rrr_fc_random.pth')
+    print("Model saved: models/rrr_fc_random.pth")
     
-    dh_params_repeated = np.tile(dh_params, (len(rrr_pos_load), 1))
+    # Train on consistent dataset at 0.5 rad precision
+    print("\n2. Training Simple4Layer on CONSISTENT dataset (0.5 rad precision)")
+    model_rrr_fc = Simple4Layer(input_size=15)
+    model_rrr_fc = train_model(model_rrr_fc, loader_train_rrr, loader_test_rrr, 
+                                epochs=100, lr=0.001, accuracy_threshold=0.5)
+    torch.save(model_rrr_fc.state_dict(), 'models/rrr_fc.pth')
+    print("Model saved: models/rrr_fc.pth")
     
-    rrr_inputs_raw = np.concatenate([rrr_pos_load, rrr_orient_load, dh_params_repeated], axis=1)
+    # Evaluate at 0.01 rad precision
+    print("\n3. Evaluating Simple4Layer at 0.01 rad precision")
+    evaluate_model(model_rrr_fc, loader_test_rrr, accuracy_threshold=0.01)
     
-    # No normalization - test if model can still learn
-    rrr_inputs = torch.tensor(rrr_inputs_raw, dtype=torch.float32)
-    rrr_outputs = torch.tensor(rrr_angles_load, dtype=torch.float32)
-    rrr_dataset = TensorDataset(rrr_inputs, rrr_outputs)
+    # Train CNN at 0.01 rad precision
+    print("\n4. Training SimpleCNN on CONSISTENT dataset (0.01 rad precision)")
+    model_rrr_cnn = SimpleCNN(input_size=15)
+    model_rrr_cnn = train_model(model_rrr_cnn, loader_train_rrr, loader_test_rrr, 
+                                 epochs=100, lr=0.001, accuracy_threshold=0.01)
+    torch.save(model_rrr_cnn.state_dict(), 'models/rrr_cnn.pth')
+    print("Model saved: models/rrr_cnn.pth")
     
-    test_size = int(TEST_SPLIT * len(rrr_dataset))
-    train_size = len(rrr_dataset) - test_size
-    rrr_train, rrr_test = random_split(rrr_dataset, [train_size, test_size])
-    print(f"RRR Consistent: {len(rrr_train)} train, {len(rrr_test)} test")
+    # Evaluate CNN at 0.01 rad precision
+    print("\n4b. Evaluating SimpleCNN at 0.01 rad precision")
+    evaluate_model(model_rrr_cnn, loader_test_rrr, accuracy_threshold=0.01)
     
-    rrrrrr_angles_load, rrrrrr_pos_load, rrrrrr_orient_load = load_dataset('data/rrrrrr_dataset.npz')
+    # Setup 6-DOF RRRRRR
+    print("\n" + "="*70)
+    print("6-DOF RRRRRR ROBOT")
+    print("="*70)
     
-    dh_rad_6dof = deg_to_rad_dh(RRRRRR_dh)
-    dh_params_6dof = dh_rad_6dof[:, :3].flatten()  # 6*3 = 18 parameters
-    dh_params_repeated_6dof = np.tile(dh_params_6dof, (len(rrrrrr_pos_load), 1))
+    dh_rad_6d = deg_to_rad_dh(RRRRRR_dh)
+    dh_params_6d = dh_rad_6d[:, :3].flatten()
     
-    rrrrrr_inputs_raw = np.concatenate([rrrrrr_pos_load, rrrrrr_orient_load, dh_params_repeated_6dof], axis=1)
-    rrrrrr_inputs = torch.tensor(rrrrrr_inputs_raw, dtype=torch.float32)
-    rrrrrr_outputs = torch.tensor(rrrrrr_angles_load, dtype=torch.float32)
-    rrrrrr_dataset = TensorDataset(rrrrrr_inputs, rrrrrr_outputs)
+    # Load consistent dataset for 6-DOF
+    angles_6d, pos_6d, orient_6d = load_dataset('data/rrrrrr_dataset.npz')
+    loader_train_6d, loader_test_6d = prepare_dataset(angles_6d, pos_6d, orient_6d, dh_params_6d)
     
-    test_size = int(TEST_SPLIT * len(rrrrrr_dataset))
-    train_size = len(rrrrrr_dataset) - test_size
-    rrrrrr_train, rrrrrr_test = random_split(rrrrrr_dataset, [train_size, test_size])
-    print(f"RRRRRR: {len(rrrrrr_train)} train, {len(rrrrrr_test)} test (Input size: {rrrrrr_inputs_raw.shape[1]})")
+    # Train on 6-DOF dataset at 0.5 rad precision
+    print("\n1. Training Simple4Layer6DOF on CONSISTENT dataset (0.5 rad precision)")
+    model_6d_fc = Simple4Layer6DOF(input_size=21)
+    model_6d_fc = train_model(model_6d_fc, loader_train_6d, loader_test_6d, 
+                               epochs=100, lr=0.001, accuracy_threshold=0.5)
+    torch.save(model_6d_fc.state_dict(), 'models/6dof_fc.pth')
+    print("Model saved: models/6dof_fc.pth")
     
-    print("\nDataset generation complete.")
+    # Evaluate at 0.01 rad precision
+    print("\n2. Evaluating Simple4Layer6DOF at 0.01 rad precision")
+    evaluate_model(model_6d_fc, loader_test_6d, accuracy_threshold=0.01)
     
-    # Train on random dataset first (to show the problem)
-    print("\n" + "="*60)
-    print("PROBLEM: Training on Random Dataset (Multiple IK Solutions)")
-    print("="*60)
-    train_loader_random = DataLoader(rrr_train_random, batch_size=64, shuffle=True)
-    test_loader_random = DataLoader(rrr_test_random, batch_size=64, shuffle=False)
+    # Train CNN at 0.01 rad precision
+    print("\n3. Training SimpleCNN6DOF on CONSISTENT dataset (0.01 rad precision)")
+    model_6d_cnn = SimpleCNN6DOF(input_size=21)
+    model_6d_cnn = train_model(model_6d_cnn, loader_train_6d, loader_test_6d, 
+                                epochs=100, lr=0.001, accuracy_threshold=0.01)
+    torch.save(model_6d_cnn.state_dict(), 'models/6dof_cnn.pth')
+    print("Model saved: models/6dof_cnn.pth")
     
-    model_random = Simple4Layer(input_size=15)
-    model_random = train_model(model_random, train_loader_random, test_loader_random, epochs=100, lr=0.001)
+    # Evaluate CNN at 0.01 rad precision
+    print("\n3b. Evaluating SimpleCNN6DOF at 0.01 rad precision")
+    evaluate_model(model_6d_cnn, loader_test_6d, accuracy_threshold=0.01)
     
-    print("\nEvaluating model trained on random dataset...")
-    evaluate_model(model_random, test_loader_random)
-    
-    # Train on consistent dataset (to show the solution)
-    print("\n" + "="*60)
-    print("SOLUTION: Training Simple4Layer on +-90 degree Dataset")
-    print("="*60)
-    train_loader = DataLoader(rrr_train, batch_size=64, shuffle=True)
-    test_loader = DataLoader(rrr_test, batch_size=64, shuffle=False)
-    
-    model_fc = Simple4Layer(input_size=15)
-    model_fc = train_model(model_fc, train_loader, test_loader, epochs=100, lr=0.001)
-    
-    print("\nEvaluating Simple4Layer model...")
-    evaluate_model(model_fc, test_loader)
-    
-    # Train CNN on consistent dataset
-    print("\n" + "="*60)
-    print("COMPARISON: Training SimpleCNN on +-90 degree Dataset")
-    print("="*60)
-    
-    model_cnn = SimpleCNN(input_size=15)
-    model_cnn = train_model(model_cnn, train_loader, test_loader, epochs=100, lr=0.001)
-    
-    print("\nEvaluating SimpleCNN model...")
-    evaluate_model(model_cnn, test_loader)
-    
-    print("\n" + "="*60)
-    print("Speed Comparison: Classical IK vs Neural Network")
-    print("="*60)
-    dh_rad = deg_to_rad_dh(RRR_dh)
-    
-    test_sample = rrr_test[0]
-    test_pose = test_sample[0][:6].numpy()
-    test_angles = test_sample[1].numpy()
-    
-    homo = forward_kinematics(dh_rad, test_angles)
-    
-    # Classical geometric IK
-    start_geom = time.time()
-    for _ in range(100):
-        angles_geom = inverse_kinematics_3dof_rrr(dh_rad, homo)
-    time_geom = (time.time() - start_geom) / 100
+    # Compare DLS vs Neural Networks for 6-DOF
+    print("\n" + "="*70)
+    print("DLS vs NEURAL NETWORK COMPARISON (6-DOF)")
+    print("="*70)
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # Neural network IK - Fully Connected
-    model_fc.eval()
+    # Get test sample from 6-DOF
+    test_sample = loader_test_6d.dataset[0]
+    angles_test = test_sample[1].numpy()
+    
+    # Calculate actual homogeneous transformation
+    homo = forward_kinematics(dh_rad_6d, angles_test)
+    
+    print("\nAccuracy Comparison (on test sample):")
+    print("-" * 70)
+    
+    # Classical DLS solver - accuracy and speed
+    print("\nClassical DLS Solver:")
+    dls_angles = inverse_kinematics_3dof_rrr(dh_rad_6d, homo)
+    dls_error = np.abs(angles_test - dls_angles)
+    dls_acc_01 = 100 * np.all(dls_error < 0.01)
+    dls_acc_05 = 100 * np.all(dls_error < 0.5)
+    print(f"  Error (radians): {np.max(dls_error):.6e}")
+    print(f"  Accuracy (0.01 rad): {dls_acc_01:.0f}%")
+    print(f"  Accuracy (0.5 rad): {dls_acc_05:.0f}%")
+    
+    # DLS Speed benchmark
+    start = time.time()
+    for _ in range(100):
+        _ = inverse_kinematics_3dof_rrr(dh_rad_6d, homo)
+    time_dls = (time.time() - start) / 100
+    
+    # Neural Network comparisons
+    model_6d_fc.eval()
+    model_6d_cnn.eval()
+    
     with torch.no_grad():
-        test_input = test_sample[0].unsqueeze(0).to(device)
-        start_nn_fc = time.time()
-        for _ in range(100):
-            angles_nn_fc = model_fc(test_input)
-        time_nn_fc = (time.time() - start_nn_fc) / 100
+        nn_input = test_sample[0].unsqueeze(0).to(device)
+        
+        # FC Network
+        print("\nSimple4Layer6DOF (FC Network):")
+        nn_angles_fc = model_6d_fc(nn_input).cpu().numpy()[0]
+        nn_error_fc = np.abs(angles_test - nn_angles_fc)
+        nn_acc_fc_01 = 100 * np.all(nn_error_fc < 0.01)
+        nn_acc_fc_05 = 100 * np.all(nn_error_fc < 0.5)
+        print(f"  Error (radians): {np.max(nn_error_fc):.6e}")
+        print(f"  Accuracy (0.01 rad): {nn_acc_fc_01:.0f}%")
+        print(f"  Accuracy (0.5 rad): {nn_acc_fc_05:.0f}%")
+        
+        # CNN Network
+        print("\nSimpleCNN6DOF (CNN Network):")
+        nn_angles_cnn = model_6d_cnn(nn_input).cpu().numpy()[0]
+        nn_error_cnn = np.abs(angles_test - nn_angles_cnn)
+        nn_acc_cnn_01 = 100 * np.all(nn_error_cnn < 0.01)
+        nn_acc_cnn_05 = 100 * np.all(nn_error_cnn < 0.5)
+        print(f"  Error (radians): {np.max(nn_error_cnn):.6e}")
+        print(f"  Accuracy (0.01 rad): {nn_acc_cnn_01:.0f}%")
+        print(f"  Accuracy (0.5 rad): {nn_acc_cnn_05:.0f}%")
     
-    # Neural network IK - CNN
-    model_cnn.eval()
+    # Speed benchmarks
+    print("\nSpeed Comparison (average over 100 runs):")
+    print("-" * 70)
+    print(f"DLS Solver:       {time_dls*1000:.4f} ms")
+    
+    start = time.time()
     with torch.no_grad():
-        test_input = test_sample[0].unsqueeze(0).to(device)
-        start_nn_cnn = time.time()
         for _ in range(100):
-            angles_nn_cnn = model_cnn(test_input)
-        time_nn_cnn = (time.time() - start_nn_cnn) / 100
+            _ = model_6d_fc(nn_input)
+    time_fc = (time.time() - start) / 100
+    print(f"Simple4Layer6DOF: {time_fc*1000:.4f} ms ({time_dls/time_fc:.2f}x speedup)")
     
-    print(f"\nAverage over 100 runs:")
-    print(f"Classical Geometric IK: {time_geom*1000:.4f} ms")
-    print(f"Simple4Layer (FC):      {time_nn_fc*1000:.4f} ms (Speedup: {time_geom/time_nn_fc:.2f}x)")
-    print(f"SimpleCNN:              {time_nn_cnn*1000:.4f} ms (Speedup: {time_geom/time_nn_cnn:.2f}x)")
-    
-    # 6-DOF Training Section
-    print("\n" + "="*60)
-    print("6-DOF ROBOT: Training Simple4Layer6DOF")
-    print("="*60)
-    rrrrrr_train_loader = DataLoader(rrrrrr_train, batch_size=64, shuffle=True)
-    rrrrrr_test_loader = DataLoader(rrrrrr_test, batch_size=64, shuffle=False)
-    
-    model_6dof_fc = Simple4Layer6DOF(input_size=21)
-    model_6dof_fc = train_model(model_6dof_fc, rrrrrr_train_loader, rrrrrr_test_loader, epochs=100, lr=0.001)
-    
-    print("\nEvaluating Simple4Layer6DOF model...")
-    evaluate_model(model_6dof_fc, rrrrrr_test_loader)
-    
-    print("\n" + "="*60)
-    print("6-DOF ROBOT: Training SimpleCNN6DOF")
-    print("="*60)
-    
-    model_6dof_cnn = SimpleCNN6DOF(input_size=21)
-    model_6dof_cnn = train_model(model_6dof_cnn, rrrrrr_train_loader, rrrrrr_test_loader, epochs=100, lr=0.001)
-    
-    print("\nEvaluating SimpleCNN6DOF model...")
-    evaluate_model(model_6dof_cnn, rrrrrr_test_loader)
+    start = time.time()
+    with torch.no_grad():
+        for _ in range(100):
+            _ = model_6d_cnn(nn_input)
+    time_cnn = (time.time() - start) / 100
+    print(f"SimpleCNN6DOF:    {time_cnn*1000:.4f} ms ({time_dls/time_cnn:.2f}x speedup)")
 
 if __name__ == "__main__":
     main()
