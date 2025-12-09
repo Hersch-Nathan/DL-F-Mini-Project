@@ -52,6 +52,12 @@
     \small \textit{This theorem provides the theoretical foundation for using neural networks to learn inverse kinematics.}
 \end{frame}
 
+\begin{frame}{Related Work}
+    Inspired by related work
+    \begin{center}
+        \includegraphics[width=0.7\textwidth]{figures/Related.png}
+    \end{center}
+\end{frame}
 \section{Robotics Kinematics}
 
 \begin{frame}{Robotic Arms}
@@ -388,8 +394,8 @@
 \section{Universal Approximation Applied to IK}
 
 \begin{frame}{Why Neural Networks for IK?}
-    \begin{block}{Key Insight}
-        Since inverse kinematics is a mapping from $(x, y, z, \text{roll}, \text{pitch}, \text{yaw})$ to joint angles $(\theta_1, \theta_2, \ldots, \theta_n)$, this should be something that we can use universal approximation theorem to learn.
+    \begin{block}{Insight}
+        Since inverse kinematics is a mapping from $(x, y, z, \text{roll}, \text{pitch}, \text{yaw})$ to joint angles $(\theta_1, \theta_2, \ldots, \theta_n)$, this should be something that we can train a network on.
     \end{block}
     
     \vspace{0.5cm}
@@ -534,16 +540,6 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
         \item Lets use $\pm 90^\circ$ or less
         \item Constraining range eliminates redundant solutions
     \end{itemize}
-    
-    \vspace{0.5cm}
-    
-    \textbf{Our Solution:}
-    \begin{itemize}
-        \item Constrain joint angles to $\pm 90^\circ$ per joint
-        \item Regenerate dataset with this constraint
-        \item Each pose now has a unique joint configuration
-        \item Network can learn well-defined inverse function
-    \end{itemize}
 \end{frame}
 
 \begin{frame}[fragile]{Updated Dataset Generation}
@@ -627,9 +623,9 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
     \begin{itemize}
         \item Accuracy at $0.5$ rad ($28.6^\circ$): \textbf{99.78\%}
         \item Accuracy at $0.01$ rad ($0.57^\circ$): \textbf{2.21\%}
+        \item Accuracy at $10^{-6}$ rad ($0.0000573^\circ$): \textbf{0.00\%}
     \end{itemize}
     
-    \textit{Note: Model achieves excellent accuracy at training threshold ($0.5$ rad) but struggles at extreme precision ($0.01$ rad). This is expected for IK---achieving sub-degree accuracy is fundamentally challenging.}
 \end{frame}
 
 \begin{frame}{6-DOF Architecture: Simple4Layer6DOF}
@@ -648,17 +644,11 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
     \begin{itemize}
         \item Increased hidden layer widths for higher complexity
         \item Same architecture pattern but larger capacity
-        \item Same hyperparameters and initialization scheme
     \end{itemize}
     
     \vspace{0.3cm}
     
-    \textbf{Performance (6-DOF):}
-    \begin{itemize}
-        \item Accuracy at $0.5$ rad ($28.6^\circ$): \textbf{48.57\%}
-        \item Accuracy at $0.01$ rad ($0.57^\circ$): \textbf{0.00\%}
-        \item Speedup vs DLS: \textbf{832.75$\times$ faster}
-    \end{itemize}
+
 \end{frame}
 
 \begin{frame}{6-DOF Experiment Setup}
@@ -683,92 +673,9 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
     \end{enumerate}
     
     \vspace{0.3cm}
-    
-    \textbf{Key Finding:} Model converged and shows massive speedup. Accuracy is moderate due to 6-DOF complexity, but speed advantage ($>800\times$) makes it practical for real-time applications.
+
 \end{frame}
 
-\begin{frame}{6-DOF Results: Neural Network Performance}
-    \textbf{Simple4Layer6DOF Accuracy Results:}
-    
-    \vspace{0.3cm}
-    
-    \begin{table}
-        \centering
-        \small
-        \begin{tabular}{|c|c|c|}
-            \hline
-            Threshold (rad) & Threshold (deg) & Accuracy \\
-            \hline
-            $0.5$ & $28.6^\circ$ & $48.57\%$ \\
-            $0.01$ & $0.57^\circ$ & $0.00\%$ \\
-            $10^{-6}$ & $0.0000573^\circ$ & $0.00\%$ \\
-            \hline
-        \end{tabular}
-    \end{table}
-    
-    \vspace{0.3cm}
-    
-    \textbf{Observations:}
-    \begin{itemize}
-        \item 6-DOF task more challenging than 3-DOF (21 input dims vs 15)
-        \item Current architecture shows limitations at this complexity level
-        \item However, \textbf{massive speedup} ($832.75\times$) still makes approach valuable for practical robotics
-    \end{itemize}
-\end{frame}
-
-\begin{frame}{DLS vs Neural Network Comparison (6-DOF)}
-    \textbf{Experimental Results (6-DOF):}
-    
-    \vspace{0.2cm}
-    
-    \textbf{Iterative Solver (DLS Method):}
-    \begin{itemize}
-        \item Time: $159.57$ ms (average over 100 runs)
-        \item Converges to high precision ($< 10^{-6}$ rad or $< 0.0000573^\circ$)
-        \item Accuracy at $0.5$ rad ($28.6^\circ$): $0\%$ (failed to converge on initial guess)
-    \end{itemize}
-    
-    \vspace{0.2cm}
-    
-    \textbf{Neural Network (Simple4Layer6DOF):}
-    \begin{itemize}
-        \item Time: $0.19$ ms per inference
-        \item \textbf{Speedup: $832.75\times$ faster than DLS!}
-        \item Single forward pass, no iteration needed
-        \item Accuracy at $0.5$ rad ($28.6^\circ$): $48.57\%$
-    \end{itemize}
-    
-    \vspace{0.2cm}
-    
-    \textbf{Key Finding:}
-    Even though NN accuracy is limited, the massive speedup ($>830\times$) demonstrates that neural networks are viable for \textbf{real-time robot control} where speed matters more than extreme sub-degree precision.
-\end{frame}
-
-\section{Results and Comparison}
-
-\begin{frame}{Complete Architecture Comparison}
-    \textbf{Summary of Tested Models:}
-    
-    \vspace{0.3cm}
-    
-    \begin{table}
-        \centering
-        \tiny
-        \begin{tabular}{|l|c|c|c|c|}
-            \hline
-            \textbf{Model} & \textbf{DOF} & \textbf{Input} & \textbf{Acc@0.5 rad} & \textbf{Acc@0.01 rad} \\
-            \hline
-            Simple4Layer & 3-DOF & 15 & $99.78\%$ & $2.21\%$ \\
-            Simple4Layer6DOF & 6-DOF & 21 & $48.57\%$ & $0.00\%$ \\
-            DLS Solver & N/A & N/A & $0\%$ & $>99\%$ \\
-            \hline
-        \end{tabular}
-    \end{table}
-    
-    \vspace{0.3cm}
-    
-    \textbf{Note:} CNN models removed after initial experimentation to focus on fully-connected architectures, which proved sufficient.
-\end{frame}
 
 \begin{frame}{Accuracy Definition}
     \textbf{For a prediction to be ``correct'':}
@@ -797,34 +704,90 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
     \end{table}
 \end{frame}
 
-\begin{frame}{Performance Comparison Summary}
-    \textbf{Speed vs Accuracy Trade-off:}
+\begin{frame}{6-DOF Results: Neural Network Performance}
+    \textbf{Simple4Layer6DOF Accuracy Results:}
     
     \vspace{0.3cm}
     
-    \begin{table}
-        \centering
-        \small
-        \begin{tabular}{|l|c|c|c|}
-            \hline
-            \textbf{Method} & \textbf{Time} & \textbf{Acc @0.5 rad} & \textbf{Speedup} \\
-            \hline
-            DLS Solver (6-DOF) & $159.57$ ms & $0\%$ & baseline \\
-            Simple4Layer (3-DOF) & $0.19$ ms & $99.78\%$ & $840\times$ \\
-            Simple4Layer6DOF (6-DOF) & $0.19$ ms & $48.57\%$ & $840\times$ \\
-            \hline
-        \end{tabular}
-    \end{table}
-    
-    \vspace{0.3cm}
-    
-    \textbf{Key Observations:}
+
+    \textbf{Performance (6-DOF):}
     \begin{itemize}
-        \item Neural networks: \textbf{$\sim 840\times$ faster} than DLS solver (6-DOF)
-        \item 3-DOF model: Excellent accuracy ($99.78\%$ @ $0.5$ rad or $28.6^\circ$)
-        \item 6-DOF model: Demonstrates scalability; accuracy lower due to task complexity
-        \item Trade-off: Speed gains enable real-time control at cost of extreme precision
-        \item Practical use: $840\times$ speedup is game-changing for real-time robotics
+        \item Accuracy at $0.5$ rad ($28.6^\circ$): \textbf{48.57\%}
+        \item Accuracy at $0.01$ rad ($0.57^\circ$): \textbf{0.00\%}
+    \end{itemize}
+    
+    \vspace{0.3cm}
+    
+    \textbf{Observations:}
+    \begin{itemize}
+        \item 6-DOF task more challenging than 3-DOF (21 input dims vs 15)
+        \item Current architecture shows limitations at this complexity level
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{DLS vs Neural Network Comparison (6-DOF)}
+    \textbf{Experimental Results (6-DOF):}
+    
+    \vspace{0.2cm}
+    
+    \textbf{Iterative Solver (DLS Method):}
+    \begin{itemize}
+        \item Time: $159.57$ ms (average over 100 runs)
+        \item Converges to high precision ($< 10^{-6}$ rad or $< 0.0000573^\circ$)
+    \end{itemize}
+    
+    \vspace{0.2cm}
+    
+    \textbf{Neural Network (Simple4Layer6DOF):}
+    \begin{itemize}
+        \item Time: $0.19$ ms per inference
+        \item \textbf{Speedup: $832.75\times$ faster than DLS!}
+        \item Single forward pass, no iteration needed
+        \item Accuracy at $0.5$ rad ($28.6^\circ$): $48.57\%$
+    \end{itemize}
+    
+    \vspace{0.2cm}
+
+\end{frame}
+
+\section{Results and Comparison}
+
+\begin{frame}{Deeper Models}
+    Tried to train deeper models, using more and larger FC layers
+    \begin{itemize}
+    \item For 3DOF: Used $15 \rightarrow 512 \rightarrow 1024 \rightarrow 1024 \rightarrow 512 \rightarrow 256 \rightarrow 128 \rightarrow 3$
+    \item For 6DOF: Used $24 \rightarrow 512 \rightarrow 1024 \rightarrow 2048 \rightarrow 1024 \rightarrow 512 \rightarrow 256 \rightarrow 128 \rightarrow 6$
+    \end{itemize}
+    Was unable to match accuracy of DLS (evaluating at $10^-6$ rad)\\
+    Need larger models with more compute
+\end{frame}
+
+\begin{frame}{Training Curves and Performance Analysis}
+    \begin{center}
+        \includegraphics[width=0.95\textwidth]{../logs/training_curves.png}
+    \end{center}
+
+\end{frame}
+
+\begin{frame}{Experimental Summary and Results}
+    \textbf{Key Findings from All Experiments:}
+    
+    \begin{itemize}
+        \item \textbf{3-DOF RRR Robot:}
+        \begin{itemize}
+            \item Random ±180° dataset: ~0% accuracy (multiple IK solutions problem)
+            \item Constrained ±90° dataset: 99.78% accuracy @ 0.5 rad ($28.6°$)
+            \item Strict evaluation @ 0.01 rad: 2.21% accuracy
+            \item Extreme precision @ 1e-6 rad: 0.00% accuracy
+        \end{itemize}
+        
+        \item \textbf{6-DOF RRRRRR Robot:}
+        \begin{itemize}
+            \item Training accuracy @ 0.5 rad: 48.57% (higher complexity challenge)
+            \item DLS vs NN speedup: \textbf{840× faster}
+            \item Timing: DLS = 159.57 ms, NN = 0.19 ms per inference
+            \item Trade-off: Speed over extreme precision 
+        \end{itemize}
     \end{itemize}
 \end{frame}
 
@@ -844,34 +807,29 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
     \vspace{0.3cm}
     
     \begin{block}{Practical Implications}
-        Pre-trained networks enable \textbf{real-time robot control}. Domain knowledge + ML combines best of both worlds. \textbf{Speed gain ($840\times$) is game-changing for robotics} even if not achieving extreme sub-degree precision.
+        Pre-trained networks enable \textbf{real-time robot control}. Domain knowledge + DL combines best of both worlds. \textbf{Speed gain ($840\times$) is game-changing for robotics} even if not achieving precision.
     \end{block}
 \end{frame}
 
-\begin{frame}{Future Work and 6-DOF Results}
+
+\begin{frame}{Future Work}
+    \textbf{Potential Improvements and Extensions:}
     \begin{itemize}
-        \item Complete 6-DOF performance evaluation
-        \item Real-time comparison with DLS solver
-        \item Integrate solution selection (handle multiple IK solutions)
-        \item Handle singularities and unreachable poses
-        \item Real robot deployment and validation
+        \item Implement larger architectures for 6-DOF (more capacity = better accuracy)
+        \item Real-time comparison with DLS solver on actual robot hardware
+        \item Integrate solution selection to handle multiple valid IK solutions
+        \item Handle singularities and unreachable poses gracefully
     \end{itemize}
     
-    \vspace{1cm}
-    
-    \textbf{Current Status:} Experiments complete. All results collected and analyzed:
-    \begin{itemize}
-        \item 3-DOF: $99.78\%$ accuracy @ $0.5$ rad ($28.6^\circ$)
-        \item 6-DOF: $48.57\%$ accuracy @ $0.5$ rad; $840\times$ speedup demonstrated
-        \item Universal Approximation Theorem empirically validated for IK
-        \item Domain knowledge (constrained ranges) critical for success
-    \end{itemize}
-    
-    \vspace{1cm}
-    
-    \begin{center}
-        \Large \textbf{Questions?}
-    \end{center}
+\end{frame}
+
+\begin{frame}
+        \LARGE \textbf{Questions?} 
+        
+        \vspace{1cm}
+        
+        \normalsize Repository: \url{https://github.com/Hersch-Nathan/DL-F-Mini-Project}
+
 \end{frame}
 
 \end{document}
