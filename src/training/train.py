@@ -1,7 +1,8 @@
 import torch
 from torch import nn
+import pandas as pd
 
-def train_model(model, train_loader, test_loader, epochs=100, lr=0.001, accuracy_threshold=0.5):
+def train_model(model, train_loader, test_loader, epochs=100, lr=0.001, accuracy_threshold=0.5, log_file=None):
     """Train model with early stopping and learning rate scheduling.
     
     Args:
@@ -22,6 +23,9 @@ def train_model(model, train_loader, test_loader, epochs=100, lr=0.001, accuracy
     best_test_loss = float('inf')
     patience = 20
     patience_counter = 0
+    
+    # Training statistics tracking
+    training_stats = []
     
     for epoch in range(epochs):
         model.train()
@@ -46,33 +50,49 @@ def train_model(model, train_loader, test_loader, epochs=100, lr=0.001, accuracy
         avg_loss = total_loss / len(train_loader)
         accuracy = 100 * correct_predictions / total_samples
         
+        # Evaluate on test set
+        model.eval()
+        test_loss = 0
+        test_samples = 0
+        test_correct = 0
+        with torch.no_grad():
+            for inputs, targets in test_loader:
+                inputs, targets = inputs.to(device), targets.to(device)
+                outputs = model(inputs)
+                test_loss += criterion(outputs, targets).item()
+                test_samples += targets.size(0)
+                angle_diff = torch.abs(outputs - targets)
+                test_correct += (angle_diff < accuracy_threshold).all(dim=1).sum().item()
+        test_avg_loss = test_loss / len(test_loader)
+        test_accuracy = 100 * test_correct / test_samples
+        
+        # Log statistics
+        training_stats.append({
+            'epoch': epoch + 1,
+            'train_loss': avg_loss,
+            'train_accuracy': accuracy,
+            'test_loss': test_avg_loss,
+            'test_accuracy': test_accuracy,
+            'learning_rate': optimizer.param_groups[0]['lr']
+        })
+        
         # Print progress every 20 epochs
         if (epoch + 1) % 20 == 0:
-            model.eval()
-            test_loss = 0
-            test_samples = 0
-            test_correct = 0
-            with torch.no_grad():
-                for inputs, targets in test_loader:
-                    inputs, targets = inputs.to(device), targets.to(device)
-                    outputs = model(inputs)
-                    test_loss += criterion(outputs, targets).item()
-                    test_samples += targets.size(0)
-                    angle_diff = torch.abs(outputs - targets)
-                    test_correct += (angle_diff < accuracy_threshold).all(dim=1).sum().item()
-            test_avg_loss = test_loss / len(test_loader)
-            test_accuracy = 100 * test_correct / test_samples
             print(f"  Epoch {epoch+1:3d} | Train Loss: {avg_loss:.6f} | Test Loss: {test_avg_loss:.6f} | Test Acc: {test_accuracy:.2f}%")
-            
-            scheduler.step(test_avg_loss)
-            
-            if test_avg_loss < best_test_loss:
-                best_test_loss = test_avg_loss
-                patience_counter = 0
-            else:
-                patience_counter += 1
-                if patience_counter >= patience:
-                    print(f"  Early stopping at epoch {epoch+1}")
-                    break
+        
+        if test_avg_loss < best_test_loss:
+            best_test_loss = test_avg_loss
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f"  Early stopping at epoch {epoch+1}")
+                break
     
-    return model
+    # Save training statistics to CSV
+    if log_file:
+        df = pd.DataFrame(training_stats)
+        df.to_csv(log_file, index=False)
+        print(f"  Training statistics saved to {log_file}")
+    
+    return model, training_stats
