@@ -4,8 +4,8 @@
 # Last Modified 12/07/25
 
 import numpy as np
-from utils import deg_to_rad_dh, homo_to_rpy
-from kinematics import forward_kinematics
+from ..robots.utils import deg_to_rad_dh, homo_to_rpy
+from ..robots.kinematics import forward_kinematics
 
 def generate_dataset(dh, num_samples=10000, angle_min=-180, angle_max=180, seed=42):
     np.random.seed(seed)

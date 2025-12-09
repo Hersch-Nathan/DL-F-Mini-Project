@@ -1,8 +1,11 @@
-# venv
 .venv
-data
-# Mac 
 .DS_Store
-
-#
-.npz
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.npz
+data/*.npz
+models_saved/*.pth
+*.log

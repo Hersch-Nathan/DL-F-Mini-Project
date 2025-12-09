@@ -8,11 +8,11 @@ import torch
 import time
 from torch.utils.data import TensorDataset, DataLoader, random_split
 
-from config import RRR_dh, RRRRRR_dh, NUM_SAMPLES, ANGLE_MIN, ANGLE_MAX, RRR_SEED, RRRRRR_SEED, TEST_SPLIT, GENERATE_RRR_DATASET, GENERATE_RRRRRR_DATASET
-from utils import deg_to_rad_dh, deg_to_rad_angle, homo_to_rpy
-from kinematics import forward_kinematics, inverse_kinematics_3dof_rrr, compute_jacobian, inverse_kinematics_dls
-from dataset import generate_dataset, generate_consistent_dataset, save_dataset, load_dataset
-from models import RRR_Linear, TejomurtKak_Model, Simple4Layer, train_model, train_tejomurt_model, evaluate_model
+from src.config import RRR_dh, RRRRRR_dh, NUM_SAMPLES, ANGLE_MIN, ANGLE_MAX, RRR_SEED, RRRRRR_SEED, TEST_SPLIT, GENERATE_RRR_DATASET, GENERATE_RRRRRR_DATASET
+from src.robots import forward_kinematics, inverse_kinematics_3dof_rrr, deg_to_rad_dh
+from src.training import generate_consistent_dataset, save_dataset, load_dataset, train_model, train_tejomurt_model
+from src.models import RRR_Linear, TejomurtKak_Model, Simple4Layer
+from src.evaluation import evaluate_model
 
 def main():
     if GENERATE_RRR_DATASET:
