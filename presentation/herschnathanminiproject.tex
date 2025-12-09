@@ -11,7 +11,7 @@
 \usecolortheme{default}
 
 \title{Applying Deep Learning to Inverse Kinematics}
-\author{Nathan Hersch}
+\author{Hersch Nathan}
 \date{\today}
 
 % Define code style
@@ -44,7 +44,7 @@
     \vspace{0.5cm}
     
     \begin{center}
-        \includegraphics[width=0.7\textwidth]{uat.png}
+        \includegraphics[width=0.7\textwidth]{figures/uat.png}
     \end{center}
     
     \vspace{0.3cm}
@@ -58,13 +58,13 @@
     \begin{columns}
         \column{0.5\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{ur.png}
+        \includegraphics[width=\textwidth]{figures/ur.png}
         
         \textbf{Universal Robot (UR)}
         
         \column{0.5\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{scara.png}
+        \includegraphics[width=\textwidth]{figures/scara.png}
         
         \textbf{SCARA Robot}
     \end{columns}
@@ -77,7 +77,7 @@
 \begin{frame}{Two-Link Planar Manipulator}
     \begin{columns}
         \column{0.5\textwidth}
-        \includegraphics[width=\textwidth]{2link.png}
+        \includegraphics[width=\textwidth]{figures/2link.png}
         
         \column{0.5\textwidth}
         \textbf{Problem Setup:}
@@ -185,6 +185,11 @@
     
     \textbf{Note:} Either $d_i$ or $\theta_i$ can be variable depending on joint type. For ease of explanation, we will only use $\theta_i$ as the variable (revolute joints).
 \end{frame}
+
+\begin{frame}{Denavit-Hartenberg (DH) Parameterization}
+    \includegraphics[width=\textwidth]{figures/dhparm.png}
+\end{frame}
+
 
 \begin{frame}{Homogeneous Transformation Matrix}
     \textbf{The transformation is represented as a product of four basic transformations:}
@@ -321,8 +326,7 @@
     \begin{itemize}
         \item Problem-specific (doesn't generalize)
         \item Requires expert knowledge of robot geometry
-        \item Difficult for 6+ DOF systems
-        \item May miss some solutions
+        \item Difficult for 3+ DOF systems
     \end{itemize}
 \end{frame}
 
@@ -378,7 +382,6 @@
         \item Slower than geometric solutions
         \item May converge to local minimum
         \item Requires good initial guess
-        \item Not suitable for real-time control at high frequencies
     \end{itemize}
 \end{frame}
 
@@ -405,14 +408,13 @@
     \begin{itemize}
         \item No iterative solving required
         \item Single forward pass through network
-        \item Potential for real-time performance
     \end{itemize}
 \end{frame}
 
 \section{The Problem: Multiple IK Solutions}
 
 \begin{frame}[fragile]{Dataset Generation Method}
-    \textbf{Our Approach:} Generate random joint angles, compute forward kinematics
+    \textbf{First Approach:} Generate random joint angles, compute forward kinematics
     
     \vspace{0.3cm}
     
@@ -529,7 +531,7 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
     \begin{itemize}
         \item Real robots operate in \textit{limited} joint ranges
         \item Not all $\pm 180^\circ$ configurations are physically useful
-        \item Industrial robots typically use $\pm 90^\circ$ or less
+        \item Lets use $\pm 90^\circ$ or less
         \item Constraining range eliminates redundant solutions
     \end{itemize}
     
@@ -597,156 +599,5 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
     \end{center}
 \end{frame}
 
-\section{Neural Network Architectures}
-
-\begin{frame}{SimpleCNN Network (3-DOF)}
-    \textbf{Convolutional Architecture:}
-    \begin{itemize}
-        \item Conv Layer 1: 32 filters, kernel size 3, ReLU
-        \item MaxPooling: kernel size 2
-        \item Conv Layer 2: 64 filters, kernel size 3, ReLU
-        \item MaxPooling: kernel size 2
-        \item Flatten and Dense layers for output
-    \end{itemize}
-    
-    \vspace{0.3cm}
-    
-    \textbf{Why CNN?}
-    \begin{itemize}
-        \item Can capture spatial relationships in input
-        \item Parameter sharing reduces overfitting
-        \item Often achieves higher accuracy
-    \end{itemize}
-    
-    \vspace{0.3cm}
-    
-    \textbf{Results at Higher Precision:}
-    \begin{itemize}
-        \item Accuracy threshold: 0.01 radians (more strict)
-        \item Achieved: \textbf{99.71\%}
-    \end{itemize}
-\end{frame}
-
-\begin{frame}{Extending to 6-DOF: RRRRRR Robot}
-    \textbf{Scaling to 6 Degrees of Freedom:}
-    \begin{itemize}
-        \item Input: 6 dimensions (position + orientation)
-        \item Hidden layers: 256, 128, 64 neurons (scaled up)
-        \item Output: 6 dimensions (all joint angles)
-    \end{itemize}
-    
-    \vspace{0.3cm}
-    
-    \textbf{Challenges:}
-    \begin{itemize}
-        \item Higher dimensional input/output space
-        \item More complex workspace geometry
-        \item Longer training time required
-        \item Same constraint strategy applies
-    \end{itemize}
-    
-    \vspace{0.3cm}
-    
-    \textbf{CNN Variant for 6-DOF:}
-    \begin{itemize}
-        \item 4 convolutional layers (progressively deeper)
-        \item More filters at each layer
-        \item Better captures complex patterns
-    \end{itemize}
-\end{frame}
-
-\section{Results and Comparison}
-
-\begin{frame}{Accuracy Metrics}
-    \textbf{For a prediction to be ``correct'':}
-    \begin{itemize}
-        \item Network predicts joint angles $\hat{\theta}$
-        \item Compute forward kinematics: $\hat{p} = FK(\hat{\theta})$
-        \item Compare to target pose $p$
-        \item Accept if $\|\hat{p} - p\| < \text{threshold}$
-    \end{itemize}
-    
-    \vspace{0.5cm}
-    
-    \textbf{Different Thresholds:}
-    \begin{table}
-        \centering
-        \small
-        \begin{tabular}{|c|c|c|}
-            \hline
-            Threshold & Degrees & Purpose \\
-            \hline
-            0.5 rad & $28.6^\circ$ & Training (loose) \\
-            0.01 rad & $0.57^\circ$ & Evaluation (tight) \\
-            $10^{-6}$ rad & $0.0000573^\circ$ & DLS comparison \\
-            \hline
-        \end{tabular}
-    \end{table}
-\end{frame}
-
-\begin{frame}{Performance Comparison}
-    \begin{table}
-        \centering
-        \small
-        \begin{tabular}{|l|c|c|}
-            \hline
-            \textbf{Method} & \textbf{Time} & \textbf{Accuracy} \\
-            \hline
-            DLS Solver & $1\text{--}10$ ms & $> 99\%$ \\
-            Simple4Layer 3-DOF & $\sim 0.1$ ms & 95.79\% \\
-            SimpleCNN 3-DOF & $\sim 0.2$ ms & 99.71\% \\
-            Simple4Layer 6-DOF & TBD & TBD \\
-            SimpleCNN 6-DOF & TBD & TBD \\
-            \hline
-        \end{tabular}
-    \end{table}
-    
-    \vspace{0.5cm}
-    
-    \textbf{Key Observations:}
-    \begin{itemize}
-        \item Neural networks: \textbf{50--100$\times$ faster}
-        \item Accuracy: Comparable to classical methods
-        \item Real-time: Enables fast robot control
-        \item Scalability: Same approach for higher DOF
-    \end{itemize}
-\end{frame}
-
-\section{Conclusion}
-
-\begin{frame}{Key Takeaways}
-    \begin{block}{Universal Approximation in Practice}
-        Neural networks successfully learned inverse kinematics, achieving 95.79\% accuracy on 3-DOF and 99.71\% on CNN variant with 50--100$\times$ speedup.
-    \end{block}
-    
-    \vspace{0.3cm}
-    
-    \begin{block}{The Challenge of Multiple Solutions}
-        Without domain knowledge: 0\% accuracy. With proper constraints: 95.79\%+ accuracy. Problem formulation matters as much as the algorithm.
-    \end{block}
-    
-    \vspace{0.3cm}
-    
-    \begin{block}{Practical Implications}
-        Pre-trained networks enable real-time robot control. Domain knowledge + ML combines best of both worlds. Scalable to higher-DOF robots.
-    \end{block}
-\end{frame}
-
-\begin{frame}{Future Work}
-    \begin{itemize}
-        \item Measure and optimize 6-DOF inference times
-        \item Integrate solution selection (multiple IK solutions)
-        \item Handle singularities and unreachable poses
-        \item Train on task-specific subspaces
-        \item Real robot deployment and validation
-        \item Compare with other architectures (RNNs, transformers)
-    \end{itemize}
-    
-    \vspace{1cm}
-    
-    \begin{center}
-        \Large \textbf{Questions?}
-    \end{center}
-\end{frame}
 
 \end{document}
