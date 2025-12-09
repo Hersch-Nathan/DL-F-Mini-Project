@@ -10,13 +10,24 @@ from torch.utils.data import TensorDataset, DataLoader, random_split
 
 from src.config import RRR_dh, RRRRRR_dh, NUM_SAMPLES, RRR_SEED, RRRRRR_SEED, TEST_SPLIT, GENERATE_RRR_DATASET, GENERATE_RRRRRR_DATASET
 from src.robots import forward_kinematics, inverse_kinematics_3dof_rrr, deg_to_rad_dh
-from src.training import generate_consistent_dataset, save_dataset, load_dataset, train_model
+from src.training import generate_dataset, generate_consistent_dataset, save_dataset, load_dataset, train_model
 from src.models import Simple4Layer
 from src.evaluation import evaluate_model
 
 def main():
     if GENERATE_RRR_DATASET:
-        print("Generating RRR dataset with consistent IK solutions")
+        print("Generating RRR random dataset (multiple IK solutions)")
+        rrr_angles_random, rrr_pos_random, rrr_orient_random = generate_dataset(
+            RRR_dh, 
+            num_samples=NUM_SAMPLES, 
+            angle_min=-90, 
+            angle_max=90, 
+            seed=RRR_SEED
+        )
+        save_dataset('data/rrr_dataset_random.npz', rrr_angles_random, rrr_pos_random, rrr_orient_random)
+        print(f"RRR random dataset saved: {len(rrr_angles_random)} samples")
+        
+        print("\nGenerating RRR consistent dataset (unique IK solutions)")
         rrr_angles, rrr_pos, rrr_orient = generate_consistent_dataset(
             RRR_dh, 
             num_samples=NUM_SAMPLES, 
@@ -25,7 +36,7 @@ def main():
             seed=RRR_SEED
         )
         save_dataset('data/rrr_dataset.npz', rrr_angles, rrr_pos, rrr_orient)
-        print(f"RRR dataset saved: {len(rrr_angles)} samples with consistent IK")
+        print(f"RRR consistent dataset saved: {len(rrr_angles)} samples with consistent IK")
     
     if GENERATE_RRRRRR_DATASET:
         print("Generating RRRRRR dataset with consistent solutions")
@@ -41,10 +52,28 @@ def main():
     
     print("\nLoading datasets with torch...")
     
-    rrr_angles_load, rrr_pos_load, rrr_orient_load = load_dataset('data/rrr_dataset.npz')
+    # Load random dataset (for demonstrating the problem)
+    print("\n--- Random Dataset (Multiple IK Solutions) ---")
+    rrr_angles_random, rrr_pos_random, rrr_orient_random = load_dataset('data/rrr_dataset_random.npz')
     
     dh_rad = deg_to_rad_dh(RRR_dh)
     dh_params = dh_rad[:, :3].flatten()
+    dh_params_repeated_random = np.tile(dh_params, (len(rrr_pos_random), 1))
+    
+    rrr_inputs_raw_random = np.concatenate([rrr_pos_random, rrr_orient_random, dh_params_repeated_random], axis=1)
+    rrr_inputs_random = torch.tensor(rrr_inputs_raw_random, dtype=torch.float32)
+    rrr_outputs_random = torch.tensor(rrr_angles_random, dtype=torch.float32)
+    rrr_dataset_random = TensorDataset(rrr_inputs_random, rrr_outputs_random)
+    
+    test_size = int(TEST_SPLIT * len(rrr_dataset_random))
+    train_size = len(rrr_dataset_random) - test_size
+    rrr_train_random, rrr_test_random = random_split(rrr_dataset_random, [train_size, test_size])
+    print(f"RRR Random: {len(rrr_train_random)} train, {len(rrr_test_random)} test")
+    
+    # Load consistent dataset (for demonstrating the solution)
+    print("\n--- Consistent Dataset (Unique IK Solutions) ---")
+    rrr_angles_load, rrr_pos_load, rrr_orient_load = load_dataset('data/rrr_dataset.npz')
+    
     dh_params_repeated = np.tile(dh_params, (len(rrr_pos_load), 1))
     
     rrr_inputs_raw = np.concatenate([rrr_pos_load, rrr_orient_load, dh_params_repeated], axis=1)
@@ -57,7 +86,7 @@ def main():
     test_size = int(TEST_SPLIT * len(rrr_dataset))
     train_size = len(rrr_dataset) - test_size
     rrr_train, rrr_test = random_split(rrr_dataset, [train_size, test_size])
-    print(f"RRR: {len(rrr_train)} train, {len(rrr_test)} test")
+    print(f"RRR Consistent: {len(rrr_train)} train, {len(rrr_test)} test")
     
     rrrrrr_angles_load, rrrrrr_pos_load, rrrrrr_orient_load = load_dataset('data/rrrrrr_dataset.npz')
     rrrrrr_inputs = torch.tensor(np.concatenate([rrrrrr_pos_load, rrrrrr_orient_load], axis=1), dtype=torch.float32)
@@ -71,16 +100,30 @@ def main():
     
     print("\nDataset generation complete.")
     
+    # Train on random dataset first (to show the problem)
+    print("\n" + "="*60)
+    print("PROBLEM: Training on Random Dataset (Multiple IK Solutions)")
+    print("="*60)
+    train_loader_random = DataLoader(rrr_train_random, batch_size=64, shuffle=True)
+    test_loader_random = DataLoader(rrr_test_random, batch_size=64, shuffle=False)
+    
+    model_random = Simple4Layer(input_size=15)
+    model_random = train_model(model_random, train_loader_random, test_loader_random, epochs=100, lr=0.001)
+    
+    print("\nEvaluating model trained on random dataset...")
+    evaluate_model(model_random, test_loader_random)
+    
+    # Train on consistent dataset (to show the solution)
+    print("\n" + "="*60)
+    print("SOLUTION: Training on Consistent Dataset (Unique IK Solutions)")
+    print("="*60)
     train_loader = DataLoader(rrr_train, batch_size=64, shuffle=True)
     test_loader = DataLoader(rrr_test, batch_size=64, shuffle=False)
     
-    print("\n" + "="*60)
-    print("Training Simple4Layer Model for RRR Robot (No Normalization)")
-    print("="*60)
     model = Simple4Layer(input_size=15)
     model = train_model(model, train_loader, test_loader, epochs=100, lr=0.001)
     
-    print("\nEvaluating Simple4Layer model...")
+    print("\nEvaluating model trained on consistent dataset...")
     evaluate_model(model, test_loader)
     
     print("\n" + "="*60)
