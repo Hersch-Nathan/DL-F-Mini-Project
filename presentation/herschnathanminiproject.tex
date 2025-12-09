@@ -11,7 +11,7 @@
 \usecolortheme{default}
 
 \title{Applying Deep Learning to Inverse Kinematics}
-\author{Deep Learning Mini Project}
+\author{Nathan Hersch}
 \date{\today}
 
 % Define code style
@@ -22,83 +22,79 @@
     showstringspaces=false,
     commentstyle=\color{gray},
     keywordstyle=\color{blue},
-    stringstyle=\color{red}
+    stringstyle=\color{red},
+    language=Python
 }
 
 \begin{document}
 
 \frame{\titlepage}
 
-\section{Universal Approximation Theorem}
-
-\begin{frame}{Section: Universal Approximation Theorem}
-    \centering
-    \vspace{2cm}
-    {\Large \textbf{Universal Approximation Theorem}}
-    \vspace{2cm}
-    
-    \textit{The foundation for learning inverse kinematics with neural networks}
+\begin{frame}{Outline}
+    \tableofcontents
 \end{frame}
 
+\section{Universal Approximation Theorem}
+
 \begin{frame}{Universal Approximation Theorem}
-    \begin{block}{Core Concept}
+    \begin{block}{Core Principle}
         Universal approximation theorem proves that for any continuous function, there exists a network that can approximate this function to any specified precision.
     \end{block}
     
-    \vspace{0.8cm}
-    
-    \textbf{Key Implications for Inverse Kinematics:}
-    \begin{itemize}
-        \item IK is a continuous mapping (given constraints)
-        \item Neural networks have sufficient capacity to learn this mapping
-        \item With proper architecture and training, we can achieve arbitrary accuracy
-        \item This justifies using NNs instead of classical solvers
-    \end{itemize}
-    
     \vspace{0.5cm}
     
-    \small \textit{The theorem provides theoretical grounding for our practical approach.}
-\end{frame}
-
-\section{Robotic Arms Background}
-
-\begin{frame}[plain]
-    \centering
-    \vspace{1cm}
-    \includegraphics[width=0.8\textwidth]{robot1.png}
+    \begin{center}
+        \includegraphics[width=0.7\textwidth]{uat.png}
+    \end{center}
+    
     \vspace{0.3cm}
     
-    \textbf{Robotic Arm}
+    \small \textit{This theorem provides the theoretical foundation for using neural networks to learn inverse kinematics.}
 \end{frame}
 
-\section{Kinematics Fundamentals}
+\section{Robotics Kinematics}
 
-\begin{frame}{Section: Kinematics Fundamentals}
-    \centering
-    \vspace{2cm}
-    {\Large \textbf{Kinematics Fundamentals}}
-    \vspace{2cm}
+\begin{frame}{Robotic Manipulators}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{ur.png}
+        
+        \textbf{Universal Robot (UR)}
+        
+        \column{0.5\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scara.png}
+        
+        \textbf{SCARA Robot}
+    \end{columns}
     
-    \textit{Understanding the geometry of robot motion}
+    \vspace{0.8cm}
+    
+    \textit{Different robot configurations require different kinematic solutions}
 \end{frame}
 
 \begin{frame}{Two-Link Planar Manipulator}
-    \begin{block}{Problem Setup}
-        For the 2-link planar robot in the figure, let:
+    \begin{columns}
+        \column{0.5\textwidth}
+        \includegraphics[width=\textwidth]{2link.png}
+        
+        \column{0.5\textwidth}
+        \textbf{Problem Setup:}
         \begin{itemize}
             \item Link lengths: $a_1, a_2$
             \item Joint angles: $\theta_1, \theta_2$
-            \item End-effector position: $(x, y)$ in the base frame
+            \item End-effector: $(x, y)$
         \end{itemize}
-    \end{block}
-    
-    \vspace{0.3cm}
-    
-    This simple case demonstrates the core IK concepts that scale to complex robots.
+        
+        \vspace{0.3cm}
+        
+        \small Simple case to understand forward and inverse kinematics
+    \end{columns}
 \end{frame}
 
 \begin{frame}{Forward Kinematics (2-Link)}
-    \textbf{From geometry of the two revolute links in the plane:}
+    \textbf{From geometry of the two revolute links:}
     
     \begin{equation}
     x = a_1 \cos\theta_1 + a_2 \cos(\theta_1 + \theta_2)
@@ -112,9 +108,9 @@
     
     \textbf{Interpretation:}
     \begin{itemize}
-        \item Given joint angles $\theta_1, \theta_2$, compute end-effector position $(x, y)$
-        \item Direct and unambiguous
-        \item Forms basis for forward kinematics matrix $T = T_1 T_2$
+        \item Given: Joint angles $\theta_1, \theta_2$
+        \item Compute: End-effector position $(x, y)$
+        \item Direct and unambiguous calculation
     \end{itemize}
 \end{frame}
 
@@ -169,19 +165,10 @@
     
     \vspace{0.3cm}
     
-    \small \textit{This approach doesn't generalize well to 3+ DOF or complex geometries}
+    \small \textit{For complex robots, we need a general framework...}
 \end{frame}
 
 \section{Denavit-Hartenberg Parameters}
-
-\begin{frame}{Section: Denavit-Hartenberg Parameters}
-    \centering
-    \vspace{2cm}
-    {\Large \textbf{Denavit-Hartenberg Parameters}}
-    \vspace{2cm}
-    
-    \textit{Generalizing robot kinematics to arbitrary configurations}
-\end{frame}
 
 \begin{frame}{Denavit-Hartenberg (DH) Parameterization}
     \begin{block}{DH Parameter Convention}
@@ -190,25 +177,69 @@
             \item $a_i$: link length (distance along $\hat{x}$-axis)
             \item $d_i$: link offset (distance along $\hat{z}$-axis)
             \item $\alpha_i$: link twist (rotation around $\hat{x}$-axis)
-            \item $\theta_i$: joint angle (rotation around $\hat{z}$-axis) --- \textbf{variable}
+            \item $\theta_i$: joint angle (rotation around $\hat{z}$-axis)
         \end{itemize}
     \end{block}
     
+    \vspace{0.5cm}
+    
+    \textbf{Note:} Either $d_i$ or $\theta_i$ can be variable depending on joint type. For ease of explanation, we will only use $\theta_i$ as the variable (revolute joints).
+\end{frame}
+
+\begin{frame}{Homogeneous Transformation Matrix}
+    \textbf{The transformation is represented as a product of four basic transformations:}
+    
+    \begin{equation*}
+    A_i = \text{Rot}_{z,\theta_i} \cdot \text{Trans}_{z,d_i} \cdot \text{Trans}_{x,a_i} \cdot \text{Rot}_{x,\alpha_i}
+    \end{equation*}
+    
     \vspace{0.3cm}
     
-    The homogeneous transformation matrix:
+    \tiny
     \begin{equation*}
-    T_i = \begin{pmatrix}
-    \cos\theta_i & -\sin\theta_i\cos\alpha_i & \sin\theta_i\sin\alpha_i & a_i\cos\theta_i \\
-    \sin\theta_i & \cos\theta_i\cos\alpha_i & -\cos\theta_i\sin\alpha_i & a_i\sin\theta_i \\
-    0 & \sin\alpha_i & \cos\alpha_i & d_i \\
+    = \begin{bmatrix}
+    c_{\theta_i} & -s_{\theta_i} & 0 & 0 \\
+    s_{\theta_i} & c_{\theta_i} & 0 & 0 \\
+    0 & 0 & 1 & 0 \\
     0 & 0 & 0 & 1
-    \end{pmatrix}
+    \end{bmatrix}
+    \begin{bmatrix}
+    1 & 0 & 0 & 0 \\
+    0 & 1 & 0 & 0 \\
+    0 & 0 & 1 & d_i \\
+    0 & 0 & 0 & 1
+    \end{bmatrix}
+    \begin{bmatrix}
+    1 & 0 & 0 & a_i \\
+    0 & 1 & 0 & 0 \\
+    0 & 0 & 1 & 0 \\
+    0 & 0 & 0 & 1
+    \end{bmatrix}
+    \begin{bmatrix}
+    1 & 0 & 0 & 0 \\
+    0 & c_{\alpha_i} & -s_{\alpha_i} & 0 \\
+    0 & s_{\alpha_i} & c_{\alpha_i} & 0 \\
+    0 & 0 & 0 & 1
+    \end{bmatrix}
     \end{equation*}
+    
+    \vspace{0.3cm}
+    
+    \normalsize
+    \begin{equation*}
+    A_i = \begin{bmatrix}
+    c_{\theta_i} & -s_{\theta_i}c_{\alpha_i} & s_{\theta_i}s_{\alpha_i} & a_i c_{\theta_i} \\
+    s_{\theta_i} & c_{\theta_i}c_{\alpha_i} & -c_{\theta_i}s_{\alpha_i} & a_i s_{\theta_i} \\
+    0 & s_{\alpha_i} & c_{\alpha_i} & d_i \\
+    0 & 0 & 0 & 1
+    \end{bmatrix}
+    \end{equation*}
+    
+    \small Where $c_{\theta_i} = \cos\theta_i$ and $s_{\theta_i} = \sin\theta_i$
 \end{frame}
 
 \begin{frame}{RRR Robot Architecture (3-DOF)}
-    \textbf{RRR Configuration:} Three revolute joints arranged vertically
+    \textbf{RRR Configuration:} Three revolute joints
     
     \vspace{0.3cm}
     
@@ -231,18 +262,18 @@
     
     \textbf{Workspace:}
     \begin{itemize}
-        \item Spherical region with radius 50 mm
         \item 3 DOF allows positioning in 3D space
-        \item Multiple configurations (redundancy)
+        \item Multiple configurations possible (redundancy)
+        \item Used as primary test case
     \end{itemize}
 \end{frame}
 
 \begin{frame}{RRRRRR Robot Architecture (6-DOF)}
-    \textbf{RRRRRR Configuration:} Six revolute joints for position and orientation
+    \textbf{RRRRRR Configuration:} Six revolute joints
     
     \vspace{0.3cm}
     
-    DH Parameters (simplified):
+    DH Parameters:
     \begin{table}
         \centering
         \tiny
@@ -264,35 +295,16 @@
     
     \textbf{Characteristics:}
     \begin{itemize}
-        \item Significantly more complex workspace
-        \item 6 degrees of freedom (full position and orientation control)
-        \item Even higher dimensionality of solutions
-        \item More challenging to learn
+        \item 6 degrees of freedom (full pose control)
+        \item More complex workspace geometry
+        \item Higher dimensional solution space
     \end{itemize}
 \end{frame}
 
 \section{Classical Solutions}
 
-\begin{frame}{Section: Classical Solutions}
-    \centering
-    \vspace{2cm}
-    {\Large \textbf{Classical Solutions}}
-    \vspace{2cm}
-    
-    \textit{Traditional approaches to inverse kinematics}
-\end{frame}
-
 \begin{frame}{Classical Geometric Solution}
     \textbf{Approach:} Decompose problem into geometric subproblems
-    
-    \vspace{0.3cm}
-    
-    For a 3-DOF RRR robot:
-    \begin{enumerate}
-        \item Use joint 3 offset to simplify to 2D positioning problem
-        \item Solve position using inverse law of cosines
-        \item Solve orientation from desired end-effector orientation
-    \end{enumerate}
     
     \vspace{0.3cm}
     
@@ -315,7 +327,7 @@
 \end{frame}
 
 \begin{frame}{Damped Least Squares (DLS) Method}
-    \textbf{Approach:} Iteratively refine joint angles to minimize pose error
+    \textbf{Iterative Approach:} Refine joint angles to minimize pose error
     
     \vspace{0.3cm}
     
@@ -326,224 +338,266 @@
     
     Where:
     \begin{itemize}
-        \item $J$: Jacobian matrix (derivatives of FK w.r.t. joint angles)
-        \item $\mathbf{e}$: pose error vector
-        \item $\lambda$: damping factor (prevents singular matrices)
+        \item $J$: Jacobian matrix --- $\frac{\partial FK(\theta)}{\partial \theta}$
+        \item $\mathbf{e}$: pose error vector --- $\mathbf{e} = p_{\text{target}} - FK(\theta_{\text{current}})$
+        \item $\lambda$: damping factor (prevents singular matrices, typically $0.01\text{--}0.1$)
     \end{itemize}
     
     \vspace{0.3cm}
     
     \textbf{Algorithm:}
     \begin{enumerate}
-        \item Start with initial guess $\theta_0 = [0, 0, 0]$
-        \item Compute forward kinematics and error
-        \item Update $\theta \leftarrow \theta + \Delta\theta$
-        \item Repeat until $|\mathbf{e}| < \epsilon$ (convergence)
+        \item Initialize: $\theta_0 = [0, 0, 0, \ldots]$
+        \item Compute: $\mathbf{e} = p_{\text{target}} - FK(\theta)$ and Jacobian $J$
+        \item Update: $\theta \leftarrow \theta + \Delta\theta$
+        \item Repeat until: $\|\mathbf{e}\| < \epsilon$ (e.g., $\epsilon = 10^{-6}$ rad)
     \end{enumerate}
-    
-    \vspace{0.3cm}
-    
-    \textbf{Precision Criterion:} $\epsilon = 10^{-6}$ radians ($\approx 0.0000573^\circ$)
 \end{frame}
 
-\begin{frame}{DLS vs Geometric Solutions}
-    \begin{columns}
-        \column{0.5\textwidth}
-        \textbf{Geometric:}
-        \begin{itemize}
-            \item Fast ($\sim 1\,\mu\text{s}$)
-            \item Problem-specific
-            \item Exact
-            \item Doesn't scale to 6+ DOF
-        \end{itemize}
-        
-        \column{0.5\textwidth}
-        \textbf{DLS:}
-        \begin{itemize}
-            \item Slower ($\sim 1\text{--}10\,\text{ms}$)
-            \item General method
-            \item Approximate but converges
-            \item Works for any DOF
-        \end{itemize}
-    \end{columns}
-    
-    \vspace{0.8cm}
-    
-    \begin{center}
-        \textbf{Both are limited to:}
-        \begin{itemize}
-            \item Computing one solution
-            \item Slow real-time control
-            \item Problem-specific tuning
-        \end{itemize}
-    \end{center}
-\end{frame}
-
-\section{The Problem}
-
-\begin{frame}{Section: The Problem}
-    \centering
-    \vspace{2cm}
-    {\Large \textbf{The Problem: Multiple IK Solutions}}
-    \vspace{2cm}
-    
-    \textit{Why classical approaches fail}
-\end{frame}
-
-\begin{frame}{The Challenge: Multiple Solutions}
-    \textbf{Problem:} Many end-effector poses have multiple joint configurations
-    
-    \vspace{0.3cm}
-    
-    \textbf{Example (RRR Robot):}
+\begin{frame}{DLS Method Characteristics}
+    \textbf{Convergence Properties:}
     \begin{itemize}
-        \item Position: $[1.8, 4.2, 49.8]$ mm
-        \item Solution 1: $\theta = [-113^\circ, -5.3^\circ, 118.9^\circ]$
-        \item Solution 2: $\theta = [67.1^\circ, 5.2^\circ, -63.4^\circ]$ (different angles, same position!)
+        \item Typically converges in 10--100 iterations
+        \item Each iteration: $\sim 100\,\mu\text{s}$ (depends on DOF)
+        \item Total time: $\sim 1\text{--}10\,\text{ms}$ per IK solution
     \end{itemize}
     
     \vspace{0.5cm}
     
-    \textbf{Training Network on $\pm 180^\circ$ Range:}
+    \textbf{Advantages:}
     \begin{itemize}
-        \item Same input (end-effector pose) has contradictory targets
-        \item Network receives conflicting training signals
-        \item Cannot learn a well-defined function
-        \item \textbf{Result: 0\% Accuracy}
+        \item General method (works for any robot)
+        \item Handles singularities through damping
+        \item Approximate but converges reliably
     \end{itemize}
     
     \vspace{0.5cm}
     
-    \small \textit{This is not a network failure---it's an ill-posed problem!}
+    \textbf{Disadvantages:}
+    \begin{itemize}
+        \item Slower than geometric solutions
+        \item May converge to local minimum
+        \item Requires good initial guess
+        \item Not suitable for real-time control at high frequencies
+    \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{First Attempt: Random $\pm 180^\circ$ Dataset}
+\section{Universal Approximation Applied to IK}
+
+\begin{frame}{Why Neural Networks for IK?}
+    \begin{block}{Key Insight}
+        Since inverse kinematics is a mapping from $(x, y, z, \text{roll}, \text{pitch}, \text{yaw})$ to joint angles $(\theta_1, \theta_2, \ldots, \theta_n)$, this should be something that we can use universal approximation theorem to learn.
+    \end{block}
+    
+    \vspace{0.5cm}
+    
+    \textbf{IK as a Function:}
+    \begin{equation*}
+    f: \mathbb{R}^6 \rightarrow \mathbb{R}^n
+    \end{equation*}
+    \begin{equation*}
+    (x, y, z, r, p, y) \mapsto (\theta_1, \theta_2, \ldots, \theta_n)
+    \end{equation*}
+    
+    \vspace{0.5cm}
+    
+    \textbf{If we can learn this mapping:}
+    \begin{itemize}
+        \item No iterative solving required
+        \item Single forward pass through network
+        \item Potential for real-time performance
+    \end{itemize}
+\end{frame}
+
+\section{The Problem: Multiple IK Solutions}
+
+\begin{frame}[fragile]{Dataset Generation Method}
+    \textbf{Our Approach:} Generate random joint angles, compute forward kinematics
+    
+    \vspace{0.3cm}
+    
+    \begin{lstlisting}[basicstyle=\ttfamily\tiny]
+def generate_consistent_dataset(dh_params, num_samples=50000):
+    """Generate dataset with unique pose-angle mappings"""
+    np.random.seed(42)
+    
+    # Generate random joint angles in [-180, +180] degrees
+    num_joints = len(dh_params)
+    angles = np.random.uniform(
+        -np.pi, np.pi, 
+        size=(num_samples, num_joints)
+    )
+    
+    positions = []
+    for angle_set in angles:
+        # Compute forward kinematics
+        T = forward_kinematics(dh_params, angle_set)
+        pos = T[:3, 3]  # Extract position
+        positions.append(pos)
+    
+    return np.array(positions), angles
+    \end{lstlisting}
+    
+    \vspace{0.2cm}
+    
+    \small \textbf{Key Point:} Random angles in full $\pm 180^\circ$ range
+\end{frame}
+
+\begin{frame}{Simple Neural Network Model}
+    \textbf{Architecture:} 4-layer fully connected network
+    
+    \vspace{0.3cm}
+    
+    \begin{itemize}
+        \item \textbf{Input Layer:} 3 neurons (end-effector position: $x, y, z$)
+        \item \textbf{Hidden Layer 1:} 128 neurons + ReLU
+        \item \textbf{Hidden Layer 2:} 64 neurons + ReLU
+        \item \textbf{Hidden Layer 3:} 32 neurons + ReLU
+        \item \textbf{Output Layer:} 3 neurons (joint angles: $\theta_1, \theta_2, \theta_3$)
+    \end{itemize}
+    
+    \vspace{0.5cm}
+    
+    \textbf{Training Configuration:}
+    \begin{itemize}
+        \item Loss: Mean Squared Error (MSE)
+        \item Optimizer: Adam (lr = 0.001)
+        \item Batch size: 32
+        \item Epochs: 1000 with early stopping
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Results: Training on Full $\pm 180^\circ$ Range}
     \begin{center}
         \textbf{Training Configuration:}
         \begin{itemize}
+            \item Dataset: 50,000 samples
             \item Joint range: $[-180^\circ, +180^\circ]$ (full range)
-            \item Dataset: 50,000 random samples
             \item Network: Simple 4-layer fully connected
-            \item Metric: MSE loss with 0.5 rad threshold
+            \item Accuracy threshold: 0.5 radians
         \end{itemize}
         
-        \vspace{0.5cm}
+        \vspace{0.8cm}
         
         \LARGE \textbf{\textcolor{red}{Accuracy: 0\%}}
         
-        \vspace{0.5cm}
-        \normalsize
+        \vspace{0.8cm}
         
-        \textbf{Why?} Multiple IK solutions create contradictory training data
+        \normalsize
+        \textit{[Placeholder: Show training loss curve and accuracy metrics]}
     \end{center}
 \end{frame}
 
-\section{The Solution}
-
-\begin{frame}{Section: The Solution}
-    \centering
-    \vspace{2cm}
-    {\Large \textbf{The Solution: Domain Knowledge}}
-    \vspace{2cm}
+\begin{frame}{Why Does This Happen?}
+    \textbf{Problem:} Multiple IK solutions for a single point
     
-    \textit{Applying constraints to make the problem well-posed}
+    \vspace{0.3cm}
+    
+    \textbf{Example --- RRR Robot:}
+    \begin{itemize}
+        \item Target position: $[1.8, 4.2, 49.8]$ mm
+        \item Solution 1: $\theta = [-113^\circ, -5.3^\circ, 118.9^\circ]$
+        \item Solution 2: $\theta = [67.1^\circ, 5.2^\circ, -63.4^\circ]$
+        \item \textbf{Same position, different joint angles!}
+    \end{itemize}
+    
+    \vspace{0.5cm}
+    
+    \textbf{Impact on Training:}
+    \begin{itemize}
+        \item Network receives \textit{contradictory} training examples
+        \item Same input $(x, y, z)$ maps to different targets $\theta$
+        \item No well-defined function to learn
+        \item Network cannot converge
+    \end{itemize}
+    
+    \vspace{0.5cm}
+    
+    \begin{center}
+        \textbf{We need domain knowledge to create a better model!}
+    \end{center}
 \end{frame}
+
+\section{Domain Knowledge Application}
 
 \begin{frame}{Solution: Constrain to Unique Solutions}
     \textbf{Key Insight:} Restrict joint range to ensure one-to-one mapping
     
     \vspace{0.3cm}
     
-    \textbf{Apply Domain Knowledge:}
+    \textbf{Domain Knowledge:}
     \begin{itemize}
-        \item Physically realistic robots operate in limited ranges
-        \item Not all $\pm 180^\circ$ configurations are used in practice
-        \item Constrain to $\pm 90^\circ$ per joint
-    \end{itemize}
-    
-    \vspace{0.3cm}
-    
-    \textbf{Result of $\pm 90^\circ$ Constraint:}
-    \begin{itemize}
-        \item Eliminates redundant solutions
-        \item Creates well-defined inverse function
-        \item Each pose has unique joint configuration
-        \item Network can learn the mapping
+        \item Real robots operate in \textit{limited} joint ranges
+        \item Not all $\pm 180^\circ$ configurations are physically useful
+        \item Industrial robots typically use $\pm 90^\circ$ or less
+        \item Constraining range eliminates redundant solutions
     \end{itemize}
     
     \vspace{0.5cm}
     
-    \begin{center}
-        \textbf{This demonstrates the importance of:}
-        \begin{itemize}
-            \item Problem understanding
-            \item Domain knowledge application
-            \item Proper problem formulation
-        \end{itemize}
-    \end{center}
+    \textbf{Our Solution:}
+    \begin{itemize}
+        \item Constrain joint angles to $\pm 90^\circ$ per joint
+        \item Regenerate dataset with this constraint
+        \item Each pose now has a unique joint configuration
+        \item Network can learn well-defined inverse function
+    \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{After Solution: Consistent $\pm 90^\circ$ Dataset}
+\begin{frame}[fragile]{Updated Dataset Generation}
+    \textbf{Modified Approach:} Constrain to $\pm 90^\circ$
+    
+    \vspace{0.3cm}
+    
+    \begin{lstlisting}[basicstyle=\ttfamily\tiny]
+def generate_consistent_dataset(dh_params, num_samples=50000):
+    """Generate dataset with unique pose-angle mappings"""
+    np.random.seed(42)
+    
+    # Generate random joint angles in [-90, +90] degrees
+    num_joints = len(dh_params)
+    angles = np.random.uniform(
+        -np.pi/2, np.pi/2,  # Changed from [-pi, pi]
+        size=(num_samples, num_joints)
+    )
+    
+    positions = []
+    for angle_set in angles:
+        # Compute forward kinematics
+        T = forward_kinematics(dh_params, angle_set)
+        pos = T[:3, 3]  # Extract position
+        positions.append(pos)
+    
+    return np.array(positions), angles
+    \end{lstlisting}
+    
+    \vspace{0.2cm}
+    
+    \small \textbf{Key Change:} Constrained angles to $\pm 90^\circ$
+\end{frame}
+
+\begin{frame}{Results: Training on Constrained $\pm 90^\circ$ Range}
     \begin{center}
-        \textbf{Updated Configuration:}
+        \textbf{Training Configuration:}
         \begin{itemize}
-            \item Joint range: $[-90^\circ, +90^\circ]$ (constrained, realistic)
-            \item Dataset: 50,000 samples from random angles
-            \item Network: Simple 4-layer fully connected
-            \item Metric: MSE loss with 0.5 rad threshold
+            \item Dataset: 50,000 samples
+            \item Joint range: $[-90^\circ, +90^\circ]$ (constrained)
+            \item Network: Same 4-layer fully connected
+            \item Accuracy threshold: 0.5 radians
         \end{itemize}
         
-        \vspace{0.5cm}
+        \vspace{0.8cm}
         
         \LARGE \textbf{\textcolor{green}{Accuracy: 95.79\%}}
         
-        \vspace{0.5cm}
-        \normalsize
+        \vspace{0.8cm}
         
-        \textbf{Why?} Well-defined mapping with unique solutions
+        \normalsize
+        \textit{[Placeholder: Show training loss curve and accuracy metrics]}
     \end{center}
 \end{frame}
 
-\section{Neural Network Approach}
-
-\begin{frame}{Section: Neural Network Approach}
-    \centering
-    \vspace{2cm}
-    {\Large \textbf{Neural Network Approach}}
-    \vspace{2cm}
-    
-    \textit{Learning inverse kinematics end-to-end}
-\end{frame}
-
-\begin{frame}{Simple 4-Layer Fully Connected Network (3-DOF)}
-    \textbf{Architecture:}
-    \begin{itemize}
-        \item Input: 3 dimensions (end-effector position: $x, y, z$)
-        \item Hidden Layer 1: 128 neurons, ReLU activation
-        \item Hidden Layer 2: 64 neurons, ReLU activation
-        \item Hidden Layer 3: 32 neurons, ReLU activation
-        \item Output: 3 dimensions (joint angles: $\theta_1, \theta_2, \theta_3$)
-    \end{itemize}
-    
-    \vspace{0.5cm}
-    
-    \textbf{Training Details:}
-    \begin{itemize}
-        \item Loss: Mean Squared Error (MSE)
-        \item Optimizer: Adam (learning rate = 0.001)
-        \item Scheduler: ReduceLROnPlateau (patience = 20)
-        \item Epochs: Up to 1000 with early stopping
-        \item Batch size: 32
-    \end{itemize}
-    
-    \vspace{0.3cm}
-    
-    \textbf{Results:}
-    \begin{itemize}
-        \item Accuracy threshold: 0.5 radians
-        \item Achieved: \textbf{95.79\%}
-    \end{itemize}
-\end{frame}
+\section{Neural Network Architectures}
 
 \begin{frame}{SimpleCNN Network (3-DOF)}
     \textbf{Convolutional Architecture:}
@@ -561,7 +615,7 @@
     \begin{itemize}
         \item Can capture spatial relationships in input
         \item Parameter sharing reduces overfitting
-        \item Often achieves higher accuracy for similar architectures
+        \item Often achieves higher accuracy
     \end{itemize}
     
     \vspace{0.3cm}
@@ -570,26 +624,25 @@
     \begin{itemize}
         \item Accuracy threshold: 0.01 radians (more strict)
         \item Achieved: \textbf{99.71\%}
-        \item Demonstrates superior performance on fine-grained accuracy
     \end{itemize}
 \end{frame}
 
 \begin{frame}{Extending to 6-DOF: RRRRRR Robot}
     \textbf{Scaling to 6 Degrees of Freedom:}
     \begin{itemize}
-        \item Input: 6 dimensions (position $x, y, z$ + orientation angles)
-        \item Hidden layers: 256, 128, 64 neurons (scaled up for complexity)
+        \item Input: 6 dimensions (position + orientation)
+        \item Hidden layers: 256, 128, 64 neurons (scaled up)
         \item Output: 6 dimensions (all joint angles)
     \end{itemize}
     
     \vspace{0.3cm}
     
-    \textbf{Challenges at 6-DOF:}
+    \textbf{Challenges:}
     \begin{itemize}
         \item Higher dimensional input/output space
         \item More complex workspace geometry
         \item Longer training time required
-        \item Potentially more multiple solutions
+        \item Same constraint strategy applies
     \end{itemize}
     
     \vspace{0.3cm}
@@ -604,22 +657,13 @@
 
 \section{Results and Comparison}
 
-\begin{frame}{Section: Results and Comparison}
-    \centering
-    \vspace{2cm}
-    {\Large \textbf{Results and Comparison}}
-    \vspace{2cm}
-    
-    \textit{Evaluating neural network performance}
-\end{frame}
-
-\begin{frame}{Accuracy Definition}
+\begin{frame}{Accuracy Metrics}
     \textbf{For a prediction to be ``correct'':}
     \begin{itemize}
         \item Network predicts joint angles $\hat{\theta}$
-        \item Compute forward kinematics: pose $\hat{p} = FK(\hat{\theta})$
+        \item Compute forward kinematics: $\hat{p} = FK(\hat{\theta})$
         \item Compare to target pose $p$
-        \item Accept if $||\hat{p} - p|| < \text{threshold}$
+        \item Accept if $\|\hat{p} - p\| < \text{threshold}$
     \end{itemize}
     
     \vspace{0.5cm}
@@ -634,24 +678,21 @@
             \hline
             0.5 rad & $28.6^\circ$ & Training (loose) \\
             0.01 rad & $0.57^\circ$ & Evaluation (tight) \\
-            $10^{-6}$ rad & $0.0000573^\circ$ & DLS comparison (very precise) \\
+            $10^{-6}$ rad & $0.0000573^\circ$ & DLS comparison \\
             \hline
         \end{tabular}
     \end{table}
-    
-    \vspace{0.3cm}
-    
-    \small \textit{Multiple thresholds allow evaluating network at different precision levels}
 \end{frame}
 
 \begin{frame}{Performance Comparison}
     \begin{table}
         \centering
+        \small
         \begin{tabular}{|l|c|c|}
             \hline
-            \textbf{Method} & \textbf{Inference Time} & \textbf{Accuracy ($10^{-6}$ rad)} \\
+            \textbf{Method} & \textbf{Time} & \textbf{Accuracy} \\
             \hline
-            DLS Solver & $\sim 1\text{--}10$ ms & $> 99\%$ \\
+            DLS Solver & $1\text{--}10$ ms & $> 99\%$ \\
             Simple4Layer 3-DOF & $\sim 0.1$ ms & 95.79\% \\
             SimpleCNN 3-DOF & $\sim 0.2$ ms & 99.71\% \\
             Simple4Layer 6-DOF & TBD & TBD \\
@@ -664,51 +705,30 @@
     
     \textbf{Key Observations:}
     \begin{itemize}
-        \item Neural networks: \textbf{50--100$\times$ faster} than iterative solvers
+        \item Neural networks: \textbf{50--100$\times$ faster}
         \item Accuracy: Comparable to classical methods
-        \item Real-time: NNs enable fast robot control
-        \item Scalability: Same approach works for higher DOF
+        \item Real-time: Enables fast robot control
+        \item Scalability: Same approach for higher DOF
     \end{itemize}
 \end{frame}
 
 \section{Conclusion}
 
-\begin{frame}{Section: Conclusion}
-    \centering
-    \vspace{2cm}
-    {\Large \textbf{Conclusion}}
-    \vspace{2cm}
-    
-    \textit{Bringing it all together}
-\end{frame}
-
 \begin{frame}{Key Takeaways}
     \begin{block}{Universal Approximation in Practice}
-        \begin{enumerate}
-            \item Neural networks successfully learned inverse kinematics
-            \item Achieved 95.79\% accuracy on 3-DOF, 99.71\% on CNN variant
-            \item Demonstrated 50--100$\times$ speedup vs classical iterative methods
-        \end{enumerate}
+        Neural networks successfully learned inverse kinematics, achieving 95.79\% accuracy on 3-DOF and 99.71\% on CNN variant with 50--100$\times$ speedup.
     \end{block}
     
     \vspace{0.3cm}
     
     \begin{block}{The Challenge of Multiple Solutions}
-        \begin{enumerate}
-            \item Without domain knowledge: 0\% accuracy
-            \item With proper constraints: 95.79\%+ accuracy
-            \item Problem formulation matters as much as the algorithm
-        \end{enumerate}
+        Without domain knowledge: 0\% accuracy. With proper constraints: 95.79\%+ accuracy. Problem formulation matters as much as the algorithm.
     \end{block}
     
     \vspace{0.3cm}
     
     \begin{block}{Practical Implications}
-        \begin{enumerate}
-            \item Pre-trained networks enable real-time robot control
-            \item Domain knowledge + ML combines best of both worlds
-            \item Scalable to higher-DOF robots (6-DOF demonstrated)
-        \end{enumerate}
+        Pre-trained networks enable real-time robot control. Domain knowledge + ML combines best of both worlds. Scalable to higher-DOF robots.
     \end{block}
 \end{frame}
 
