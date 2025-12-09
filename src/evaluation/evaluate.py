@@ -1,17 +1,14 @@
 import torch
 from torch import nn
 
-def evaluate_model(model, test_loader, output_mean, output_std):
+def evaluate_model(model, test_loader):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.eval()
-    criterion = nn.HuberLoss(delta=1.0)
+    criterion = nn.MSELoss()
     total_loss = 0
     total_samples = 0
     correct_predictions_strict = 0
     correct_predictions_relaxed = 0
-    
-    output_mean_t = torch.tensor(output_mean, dtype=torch.float32).to(device)
-    output_std_t = torch.tensor(output_std, dtype=torch.float32).to(device)
     
     with torch.no_grad():
         for inputs, targets in test_loader:
@@ -21,9 +18,7 @@ def evaluate_model(model, test_loader, output_mean, output_std):
             total_loss += loss.item()
             
             total_samples += targets.size(0)
-            outputs_denorm = outputs * output_std_t + output_mean_t
-            targets_denorm = targets * output_std_t + output_mean_t
-            angle_diff = torch.abs(outputs_denorm - targets_denorm)
+            angle_diff = torch.abs(outputs - targets)
             correct_predictions_strict += (angle_diff < 0.1).all(dim=1).sum().item()
             correct_predictions_relaxed += (angle_diff < 0.5).all(dim=1).sum().item()
     

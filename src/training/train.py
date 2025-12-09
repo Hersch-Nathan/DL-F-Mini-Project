@@ -1,17 +1,14 @@
 import torch
 from torch import nn
 
-def train_model(model, train_loader, test_loader, output_mean, output_std, epochs=100, lr=0.001):
+def train_model(model, train_loader, test_loader, epochs=100, lr=0.001):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training on device: {device}")
     model = model.to(device)
     
-    criterion = nn.HuberLoss(delta=1.0)
+    criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10)
-    
-    output_mean_t = torch.tensor(output_mean, dtype=torch.float32).to(device)
-    output_std_t = torch.tensor(output_std, dtype=torch.float32).to(device)
     
     best_test_loss = float('inf')
     patience = 20
@@ -34,9 +31,7 @@ def train_model(model, train_loader, test_loader, output_mean, output_std, epoch
             total_loss += loss.item()
             
             total_samples += targets.size(0)
-            outputs_denorm = outputs * output_std_t + output_mean_t
-            targets_denorm = targets * output_std_t + output_mean_t
-            angle_diff = torch.abs(outputs_denorm - targets_denorm)
+            angle_diff = torch.abs(outputs - targets)
             correct_predictions += (angle_diff < 0.5).all(dim=1).sum().item()
         
         avg_loss = total_loss / len(train_loader)
@@ -53,9 +48,7 @@ def train_model(model, train_loader, test_loader, output_mean, output_std, epoch
                     outputs = model(inputs)
                     test_loss += criterion(outputs, targets).item()
                     test_samples += targets.size(0)
-                    outputs_denorm = outputs * output_std_t + output_mean_t
-                    targets_denorm = targets * output_std_t + output_mean_t
-                    angle_diff = torch.abs(outputs_denorm - targets_denorm)
+                    angle_diff = torch.abs(outputs - targets)
                     test_correct += (angle_diff < 0.5).all(dim=1).sum().item()
             test_avg_loss = test_loss / len(test_loader)
             test_accuracy = 100 * test_correct / test_samples

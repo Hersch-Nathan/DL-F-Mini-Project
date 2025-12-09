@@ -8,7 +8,7 @@ import torch
 import time
 from torch.utils.data import TensorDataset, DataLoader, random_split
 
-from src.config import RRR_dh, RRRRRR_dh, NUM_SAMPLES, ANGLE_MIN, ANGLE_MAX, RRR_SEED, RRRRRR_SEED, TEST_SPLIT, GENERATE_RRR_DATASET, GENERATE_RRRRRR_DATASET
+from src.config import RRR_dh, RRRRRR_dh, NUM_SAMPLES, RRR_SEED, RRRRRR_SEED, TEST_SPLIT, GENERATE_RRR_DATASET, GENERATE_RRRRRR_DATASET
 from src.robots import forward_kinematics, inverse_kinematics_3dof_rrr, deg_to_rad_dh
 from src.training import generate_consistent_dataset, save_dataset, load_dataset, train_model
 from src.models import Simple4Layer
@@ -49,16 +49,9 @@ def main():
     
     rrr_inputs_raw = np.concatenate([rrr_pos_load, rrr_orient_load, dh_params_repeated], axis=1)
     
-    input_mean = rrr_inputs_raw.mean(axis=0)
-    input_std = rrr_inputs_raw.std(axis=0) + 1e-8
-    rrr_inputs_norm = (rrr_inputs_raw - input_mean) / input_std
-    
-    output_mean = rrr_angles_load.mean(axis=0)
-    output_std = rrr_angles_load.std(axis=0) + 1e-8
-    rrr_outputs_norm = (rrr_angles_load - output_mean) / output_std
-    
-    rrr_inputs = torch.tensor(rrr_inputs_norm, dtype=torch.float32)
-    rrr_outputs = torch.tensor(rrr_outputs_norm, dtype=torch.float32)
+    # No normalization - test if model can still learn
+    rrr_inputs = torch.tensor(rrr_inputs_raw, dtype=torch.float32)
+    rrr_outputs = torch.tensor(rrr_angles_load, dtype=torch.float32)
     rrr_dataset = TensorDataset(rrr_inputs, rrr_outputs)
     
     test_size = int(TEST_SPLIT * len(rrr_dataset))
@@ -82,13 +75,13 @@ def main():
     test_loader = DataLoader(rrr_test, batch_size=64, shuffle=False)
     
     print("\n" + "="*60)
-    print("Training Simple4Layer Model for RRR Robot")
+    print("Training Simple4Layer Model for RRR Robot (No Normalization)")
     print("="*60)
     model = Simple4Layer(input_size=15)
-    model = train_model(model, train_loader, test_loader, output_mean, output_std, epochs=100, lr=0.001)
+    model = train_model(model, train_loader, test_loader, epochs=100, lr=0.001)
     
     print("\nEvaluating Simple4Layer model...")
-    evaluate_model(model, test_loader, output_mean, output_std)
+    evaluate_model(model, test_loader)
     
     print("\n" + "="*60)
     print("Speed Comparison: Classical IK vs Neural Network")
