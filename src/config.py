@@ -30,5 +30,8 @@ RRRRRR_SEED = 123
 ACCURACY_THRESHOLD = 1e-6
 
 # Dataset Generation Flags
-GENERATE_RRR_DATASET = False
-GENERATE_RRRRRR_DATASET = False
+GENERATE_RRR_DATASET = True
+GENERATE_RRRRRR_DATASET = True
+
+# Evaluation Mode (skip training, load pre-trained models)
+EVALUATION_ONLY = False

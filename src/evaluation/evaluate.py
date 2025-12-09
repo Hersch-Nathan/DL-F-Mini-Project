@@ -10,6 +10,7 @@ def evaluate_model(model, test_loader, accuracy_threshold=0.5):
         accuracy_threshold: Accuracy threshold in radians for correct predictions
     """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = model.to(device)
     model.eval()
     criterion = nn.MSELoss()
     total_loss = 0

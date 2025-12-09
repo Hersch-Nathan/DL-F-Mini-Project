@@ -138,3 +138,65 @@ def inverse_kinematics_dls(dh, desired_pos, lamda=0.1, epsilon=1e-6, max_iter=10
         angle = angle + dth
     
     return angle
+
+def inverse_kinematics_dls_6dof(dh, target_homo, lamda=0.01, epsilon=1e-6, max_iter=1000, initial_angles=None):
+    """6-DOF Damped Least Squares IK solver.
+    
+    Args:
+        dh: DH parameters (nx4)
+        target_homo: Target 4x4 homogeneous transformation matrix
+        lamda: Damping factor (smaller = less damping, faster convergence)
+        epsilon: Convergence threshold
+        max_iter: Maximum iterations
+        initial_angles: Initial guess for joint angles (if None, uses zeros)
+    
+    Returns:
+        Joint angles that achieve the target pose
+    """
+    n_joints = dh.shape[0]
+    angle = initial_angles if initial_angles is not None else np.random.uniform(-0.1, 0.1, n_joints)
+    
+    target_pos = target_homo[0:3, 3]
+    target_rot = target_homo[0:3, 0:3]
+    
+    for iteration in range(max_iter):
+        T = forward_kinematics(dh, angle)
+        current_pos = T[0:3, 3]
+        current_rot = T[0:3, 0:3]
+        
+        # Position error
+        pos_error = target_pos - current_pos
+        
+        # Orientation error (axis-angle representation)
+        rot_error_matrix = target_rot @ current_rot.T
+        # Extract rotation vector from rotation matrix
+        angle_axis = np.arccos(np.clip((np.trace(rot_error_matrix) - 1) / 2, -1, 1))
+        if angle_axis > 1e-10:
+            axis = np.array([
+                rot_error_matrix[2, 1] - rot_error_matrix[1, 2],
+                rot_error_matrix[0, 2] - rot_error_matrix[2, 0],
+                rot_error_matrix[1, 0] - rot_error_matrix[0, 1]
+            ]) / (2 * np.sin(angle_axis))
+            ori_error = angle_axis * axis
+        else:
+            ori_error = np.zeros(3)
+        
+        # Combined error vector (6D: position + orientation)
+        error = np.concatenate([pos_error, ori_error])
+        
+        # Check convergence
+        if np.linalg.norm(error) <= epsilon:
+            break
+        
+        # Compute Jacobian
+        J = compute_jacobian(dh, angle)
+        
+        # Damped least squares update
+        J_inter = np.linalg.inv(J.T @ J + (lamda**2) * np.eye(n_joints))
+        dth = J_inter @ J.T @ error
+        
+        # Adaptive step size for stability
+        step_size = 0.5 if iteration < 10 else 0.3 if iteration < 50 else 0.1
+        angle = angle + step_size * dth
+    
+    return angle
