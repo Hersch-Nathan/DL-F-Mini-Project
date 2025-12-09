@@ -1,1 +1,1 @@
-from .rrr_models import Simple4Layer
+from .rrr_models import Simple4Layer, SimpleCNN

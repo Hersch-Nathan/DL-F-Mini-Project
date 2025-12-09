@@ -11,24 +11,24 @@ from torch.utils.data import TensorDataset, DataLoader, random_split
 from src.config import RRR_dh, RRRRRR_dh, NUM_SAMPLES, RRR_SEED, RRRRRR_SEED, TEST_SPLIT, GENERATE_RRR_DATASET, GENERATE_RRRRRR_DATASET
 from src.robots import forward_kinematics, inverse_kinematics_3dof_rrr, deg_to_rad_dh
 from src.training import generate_dataset, generate_consistent_dataset, save_dataset, load_dataset, train_model
-from src.models import Simple4Layer
+from src.models import Simple4Layer, SimpleCNN
 from src.evaluation import evaluate_model
 
 def main():
     if GENERATE_RRR_DATASET:
-        print("Generating RRR random dataset (multiple IK solutions)")
+        print("Generating RRR random dataset (angles +-180)")
         rrr_angles_random, rrr_pos_random, rrr_orient_random = generate_dataset(
             RRR_dh, 
             num_samples=NUM_SAMPLES, 
-            angle_min=-90, 
-            angle_max=90, 
+            angle_min=-180, 
+            angle_max=180, 
             seed=RRR_SEED
         )
         save_dataset('data/rrr_dataset_random.npz', rrr_angles_random, rrr_pos_random, rrr_orient_random)
         print(f"RRR random dataset saved: {len(rrr_angles_random)} samples")
         
-        print("\nGenerating RRR consistent dataset (unique IK solutions)")
-        rrr_angles, rrr_pos, rrr_orient = generate_consistent_dataset(
+        print("\nGenerating RRR consistent dataset (angles +-90)")
+        rrr_angles, rrr_pos, rrr_orient = generate_dataset(
             RRR_dh, 
             num_samples=NUM_SAMPLES, 
             angle_min=-90, 
@@ -36,7 +36,7 @@ def main():
             seed=RRR_SEED
         )
         save_dataset('data/rrr_dataset.npz', rrr_angles, rrr_pos, rrr_orient)
-        print(f"RRR consistent dataset saved: {len(rrr_angles)} samples with consistent IK")
+        print(f"RRR consistent dataset saved: {len(rrr_angles)} samples")
     
     if GENERATE_RRRRRR_DATASET:
         print("Generating RRRRRR dataset with consistent solutions")
@@ -115,16 +115,27 @@ def main():
     
     # Train on consistent dataset (to show the solution)
     print("\n" + "="*60)
-    print("SOLUTION: Training on Consistent Dataset (Unique IK Solutions)")
+    print("SOLUTION: Training Simple4Layer on +-90 degree Dataset")
     print("="*60)
     train_loader = DataLoader(rrr_train, batch_size=64, shuffle=True)
     test_loader = DataLoader(rrr_test, batch_size=64, shuffle=False)
     
-    model = Simple4Layer(input_size=15)
-    model = train_model(model, train_loader, test_loader, epochs=100, lr=0.001)
+    model_fc = Simple4Layer(input_size=15)
+    model_fc = train_model(model_fc, train_loader, test_loader, epochs=100, lr=0.001)
     
-    print("\nEvaluating model trained on consistent dataset...")
-    evaluate_model(model, test_loader)
+    print("\nEvaluating Simple4Layer model...")
+    evaluate_model(model_fc, test_loader)
+    
+    # Train CNN on consistent dataset
+    print("\n" + "="*60)
+    print("COMPARISON: Training SimpleCNN on +-90 degree Dataset")
+    print("="*60)
+    
+    model_cnn = SimpleCNN(input_size=15)
+    model_cnn = train_model(model_cnn, train_loader, test_loader, epochs=100, lr=0.001)
+    
+    print("\nEvaluating SimpleCNN model...")
+    evaluate_model(model_cnn, test_loader)
     
     print("\n" + "="*60)
     print("Speed Comparison: Classical IK vs Neural Network")
@@ -145,19 +156,28 @@ def main():
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # Neural network IK
-    model.eval()
+    # Neural network IK - Fully Connected
+    model_fc.eval()
     with torch.no_grad():
         test_input = test_sample[0].unsqueeze(0).to(device)
-        start_nn = time.time()
+        start_nn_fc = time.time()
         for _ in range(100):
-            angles_nn = model(test_input)
-        time_nn = (time.time() - start_nn) / 100
+            angles_nn_fc = model_fc(test_input)
+        time_nn_fc = (time.time() - start_nn_fc) / 100
+    
+    # Neural network IK - CNN
+    model_cnn.eval()
+    with torch.no_grad():
+        test_input = test_sample[0].unsqueeze(0).to(device)
+        start_nn_cnn = time.time()
+        for _ in range(100):
+            angles_nn_cnn = model_cnn(test_input)
+        time_nn_cnn = (time.time() - start_nn_cnn) / 100
     
     print(f"\nAverage over 100 runs:")
     print(f"Classical Geometric IK: {time_geom*1000:.4f} ms")
-    print(f"Neural Network IK: {time_nn*1000:.4f} ms")
-    print(f"Speedup: {time_geom/time_nn:.2f}x faster")
+    print(f"Simple4Layer (FC):      {time_nn_fc*1000:.4f} ms (Speedup: {time_geom/time_nn_fc:.2f}x)")
+    print(f"SimpleCNN:              {time_nn_cnn*1000:.4f} ms (Speedup: {time_geom/time_nn_cnn:.2f}x)")
 
 if __name__ == "__main__":
     main()
