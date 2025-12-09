@@ -1,0 +1,28 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.log
+*.out
+*.toc
+*.nav
+*.snm
+*.vrb
+*.dvi
+*.ps
+*.synctex.gz
+
+# Build directory
+build/
+_minted-*/
+
+# Editor files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Keep PDF files
+!*.pdf
