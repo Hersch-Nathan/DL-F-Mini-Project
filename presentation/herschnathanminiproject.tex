@@ -54,7 +54,7 @@
 
 \section{Robotics Kinematics}
 
-\begin{frame}{Robotic Manipulators}
+\begin{frame}{Robotic Arms}
     \begin{columns}
         \column{0.5\textwidth}
         \centering
@@ -316,7 +316,7 @@
     \textbf{Advantages:}
     \begin{itemize}
         \item Algebraically exact solutions
-        \item Computationally fast ($\sim 1\,\mu\text{s}$)
+        \item Computationally fast 
         \item Deterministic
     \end{itemize}
     
@@ -465,11 +465,11 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
         \item Loss: Mean Squared Error (MSE)
         \item Optimizer: Adam (lr = 0.001)
         \item Batch size: 32
-        \item Epochs: 1000 with early stopping
+        \item Epochs: 100 with early stopping
     \end{itemize}
 \end{frame}
 
-    \textbf{Results: Training on Full $\pm 180^\circ$ Range}
+\begin{frame}{Results: Training on Full $\pm 180^\circ$ Range}
     \begin{center}
         \textbf{Training Configuration:}
         \begin{itemize}
@@ -578,7 +578,7 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
     \small \textbf{Key Change:} Constrained angles to $\pm 90^\circ$
 \end{frame}
 
-    \textbf{Results: Training on Constrained $\pm 90^\circ$ Range}
+\begin{frame}{Results: Training on Constrained $\pm 90^\circ$ Range}
     \begin{center}
         \textbf{Training Configuration:}
         \begin{itemize}
@@ -697,7 +697,7 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
         \small
         \begin{tabular}{|c|c|c|}
             \hline
-            Threshold (rad) & Threshold (deg) & Accuracy \\\
+            Threshold (rad) & Threshold (deg) & Accuracy \\
             \hline
             $0.5$ & $28.6^\circ$ & $48.57\%$ \\
             $0.01$ & $0.57^\circ$ & $0.00\%$ \\
@@ -713,6 +713,7 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
         \item 6-DOF task more challenging than 3-DOF (21 input dims vs 15)
         \item Current architecture shows limitations at this complexity level
         \item However, \textbf{massive speedup} ($832.75\times$) still makes approach valuable for practical robotics
+    \end{itemize}
 \end{frame}
 
 \begin{frame}{DLS vs Neural Network Comparison (6-DOF)}
@@ -850,7 +851,6 @@ def generate_consistent_dataset(dh_params, num_samples=50000):
 \begin{frame}{Future Work and 6-DOF Results}
     \begin{itemize}
         \item Complete 6-DOF performance evaluation
-        \item Measure actual inference times on GPU
         \item Real-time comparison with DLS solver
         \item Integrate solution selection (handle multiple IK solutions)
         \item Handle singularities and unreachable poses
