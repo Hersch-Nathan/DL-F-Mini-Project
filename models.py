@@ -84,6 +84,27 @@ class TejomurtKak_Model(nn.Module):
         x = self.subnet3(x)
         return x
 
+class Simple4Layer(nn.Module):
+    def __init__(self, input_size=15):
+        super().__init__()
+        self.fc1 = nn.Linear(input_size, 128)
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, 32)
+        self.fc4 = nn.Linear(32, 3)
+        self.relu = nn.ReLU()
+        
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.zeros_(m.bias)
+    
+    def forward(self, x):
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        x = self.relu(self.fc3(x))
+        x = self.fc4(x)
+        return x
+
 def train_model(model, train_loader, test_loader, output_mean, output_std, epochs=100, lr=0.001):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training on device: {device}")

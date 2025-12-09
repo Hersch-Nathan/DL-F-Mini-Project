@@ -11,33 +11,33 @@ from torch.utils.data import TensorDataset, DataLoader, random_split
 from config import RRR_dh, RRRRRR_dh, NUM_SAMPLES, ANGLE_MIN, ANGLE_MAX, RRR_SEED, RRRRRR_SEED, TEST_SPLIT, GENERATE_RRR_DATASET, GENERATE_RRRRRR_DATASET
 from utils import deg_to_rad_dh, deg_to_rad_angle, homo_to_rpy
 from kinematics import forward_kinematics, inverse_kinematics_3dof_rrr, compute_jacobian, inverse_kinematics_dls
-from dataset import generate_dataset, save_dataset, load_dataset
-from models import RRR_Linear, TejomurtKak_Model, train_model, train_tejomurt_model, evaluate_model
+from dataset import generate_dataset, generate_consistent_dataset, save_dataset, load_dataset
+from models import RRR_Linear, TejomurtKak_Model, Simple4Layer, train_model, train_tejomurt_model, evaluate_model
 
 def main():
     if GENERATE_RRR_DATASET:
-        print("Generating RRR dataset")
-        rrr_angles, rrr_pos, rrr_orient = generate_dataset(
+        print("Generating RRR dataset with consistent IK solutions")
+        rrr_angles, rrr_pos, rrr_orient = generate_consistent_dataset(
             RRR_dh, 
             num_samples=NUM_SAMPLES, 
-            angle_min=ANGLE_MIN, 
-            angle_max=ANGLE_MAX, 
+            angle_min=-90, 
+            angle_max=90, 
             seed=RRR_SEED
         )
         save_dataset('data/rrr_dataset.npz', rrr_angles, rrr_pos, rrr_orient)
-        print(f"RRR dataset saved: {NUM_SAMPLES} samples")
+        print(f"RRR dataset saved: {len(rrr_angles)} samples with consistent IK")
     
     if GENERATE_RRRRRR_DATASET:
-        print("Generating RRRRRR dataset")
-        rrrrrr_angles, rrrrrr_pos, rrrrrr_orient = generate_dataset(
+        print("Generating RRRRRR dataset with consistent solutions")
+        rrrrrr_angles, rrrrrr_pos, rrrrrr_orient = generate_consistent_dataset(
             RRRRRR_dh, 
             num_samples=NUM_SAMPLES, 
-            angle_min=ANGLE_MIN, 
-            angle_max=ANGLE_MAX, 
+            angle_min=-90, 
+            angle_max=90, 
             seed=RRRRRR_SEED
         )
         save_dataset('data/rrrrrr_dataset.npz', rrrrrr_angles, rrrrrr_pos, rrrrrr_orient)
-        print(f"RRRRRR dataset saved: {NUM_SAMPLES} samples")
+        print(f"RRRRRR dataset saved: {len(rrrrrr_angles)} samples with consistent solutions")
     
     print("\nLoading datasets with torch...")
     
@@ -91,6 +91,15 @@ def main():
     evaluate_model(model1, test_loader, output_mean, output_std)
     
     print("\n" + "="*60)
+    print("Training Simple4Layer Model (4 Fully Connected Layers)")
+    print("="*60)
+    model_simple = Simple4Layer(input_size=15)
+    model_simple = train_model(model_simple, train_loader, test_loader, output_mean, output_std, epochs=100, lr=0.001)
+    
+    print("\nEvaluating Simple4Layer model...")
+    evaluate_model(model_simple, test_loader, output_mean, output_std)
+    
+    print("\n" + "="*60)
     print("Training TejomurtKak_Model (Structured Network from Paper)")
     print("="*60)
     model2 = TejomurtKak_Model(input_size=15)
@@ -125,6 +134,14 @@ def main():
             angles_nn1 = model1(test_input)
         time_nn1 = (time.time() - start_nn1) / 100
     
+    model_simple.eval()
+    with torch.no_grad():
+        test_input = test_sample[0].unsqueeze(0).to(device)
+        start_nn_simple = time.time()
+        for _ in range(100):
+            angles_nn_simple = model_simple(test_input)
+        time_nn_simple = (time.time() - start_nn_simple) / 100
+    
     model2.eval()
     with torch.no_grad():
         test_input = test_sample[0].unsqueeze(0).to(device)
@@ -136,6 +153,7 @@ def main():
     print(f"\nAverage over 100 runs:")
     print(f"Geometric IK: {time_geom*1000:.4f} ms")
     print(f"RRR_Linear (Deep): {time_nn1*1000:.4f} ms (Speedup: {time_geom/time_nn1:.2f}x)")
+    print(f"Simple4Layer: {time_nn_simple*1000:.4f} ms (Speedup: {time_geom/time_nn_simple:.2f}x)")
     print(f"TejomurtKak (Structured): {time_nn2*1000:.4f} ms (Speedup: {time_geom/time_nn2:.2f}x)")
 
 if __name__ == "__main__":
