@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from ..config import ACCURACY_THRESHOLD
 
 def evaluate_model(model, test_loader):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -19,7 +20,7 @@ def evaluate_model(model, test_loader):
             
             total_samples += targets.size(0)
             angle_diff = torch.abs(outputs - targets)
-            correct_predictions_dls += (angle_diff < 1e-6).all(dim=1).sum().item()
+            correct_predictions_dls += (angle_diff < ACCURACY_THRESHOLD).all(dim=1).sum().item()
             correct_predictions_relaxed += (angle_diff < 0.5).all(dim=1).sum().item()
     
     avg_loss = total_loss / len(test_loader)

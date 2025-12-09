@@ -11,7 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader, random_split
 from src.config import RRR_dh, RRRRRR_dh, NUM_SAMPLES, RRR_SEED, RRRRRR_SEED, TEST_SPLIT, GENERATE_RRR_DATASET, GENERATE_RRRRRR_DATASET
 from src.robots import forward_kinematics, inverse_kinematics_3dof_rrr, deg_to_rad_dh
 from src.training import generate_dataset, generate_consistent_dataset, save_dataset, load_dataset, train_model
-from src.models import Simple4Layer, SimpleCNN
+from src.models import Simple4Layer, SimpleCNN, Simple4Layer6DOF, SimpleCNN6DOF
 from src.evaluation import evaluate_model
 
 def main():
@@ -89,14 +89,20 @@ def main():
     print(f"RRR Consistent: {len(rrr_train)} train, {len(rrr_test)} test")
     
     rrrrrr_angles_load, rrrrrr_pos_load, rrrrrr_orient_load = load_dataset('data/rrrrrr_dataset.npz')
-    rrrrrr_inputs = torch.tensor(np.concatenate([rrrrrr_pos_load, rrrrrr_orient_load], axis=1), dtype=torch.float32)
+    
+    dh_rad_6dof = deg_to_rad_dh(RRRRRR_dh)
+    dh_params_6dof = dh_rad_6dof[:, :3].flatten()  # 6*3 = 18 parameters
+    dh_params_repeated_6dof = np.tile(dh_params_6dof, (len(rrrrrr_pos_load), 1))
+    
+    rrrrrr_inputs_raw = np.concatenate([rrrrrr_pos_load, rrrrrr_orient_load, dh_params_repeated_6dof], axis=1)
+    rrrrrr_inputs = torch.tensor(rrrrrr_inputs_raw, dtype=torch.float32)
     rrrrrr_outputs = torch.tensor(rrrrrr_angles_load, dtype=torch.float32)
     rrrrrr_dataset = TensorDataset(rrrrrr_inputs, rrrrrr_outputs)
     
     test_size = int(TEST_SPLIT * len(rrrrrr_dataset))
     train_size = len(rrrrrr_dataset) - test_size
     rrrrrr_train, rrrrrr_test = random_split(rrrrrr_dataset, [train_size, test_size])
-    print(f"RRRRRR: {len(rrrrrr_train)} train, {len(rrrrrr_test)} test")
+    print(f"RRRRRR: {len(rrrrrr_train)} train, {len(rrrrrr_test)} test (Input size: {rrrrrr_inputs_raw.shape[1]})")
     
     print("\nDataset generation complete.")
     
@@ -178,6 +184,29 @@ def main():
     print(f"Classical Geometric IK: {time_geom*1000:.4f} ms")
     print(f"Simple4Layer (FC):      {time_nn_fc*1000:.4f} ms (Speedup: {time_geom/time_nn_fc:.2f}x)")
     print(f"SimpleCNN:              {time_nn_cnn*1000:.4f} ms (Speedup: {time_geom/time_nn_cnn:.2f}x)")
+    
+    # 6-DOF Training Section
+    print("\n" + "="*60)
+    print("6-DOF ROBOT: Training Simple4Layer6DOF")
+    print("="*60)
+    rrrrrr_train_loader = DataLoader(rrrrrr_train, batch_size=64, shuffle=True)
+    rrrrrr_test_loader = DataLoader(rrrrrr_test, batch_size=64, shuffle=False)
+    
+    model_6dof_fc = Simple4Layer6DOF(input_size=21)
+    model_6dof_fc = train_model(model_6dof_fc, rrrrrr_train_loader, rrrrrr_test_loader, epochs=100, lr=0.001)
+    
+    print("\nEvaluating Simple4Layer6DOF model...")
+    evaluate_model(model_6dof_fc, rrrrrr_test_loader)
+    
+    print("\n" + "="*60)
+    print("6-DOF ROBOT: Training SimpleCNN6DOF")
+    print("="*60)
+    
+    model_6dof_cnn = SimpleCNN6DOF(input_size=21)
+    model_6dof_cnn = train_model(model_6dof_cnn, rrrrrr_train_loader, rrrrrr_test_loader, epochs=100, lr=0.001)
+    
+    print("\nEvaluating SimpleCNN6DOF model...")
+    evaluate_model(model_6dof_cnn, rrrrrr_test_loader)
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from ..config import ACCURACY_THRESHOLD
 
 def train_model(model, train_loader, test_loader, epochs=100, lr=0.001):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -32,7 +33,7 @@ def train_model(model, train_loader, test_loader, epochs=100, lr=0.001):
             
             total_samples += targets.size(0)
             angle_diff = torch.abs(outputs - targets)
-            correct_predictions += (angle_diff < 1e-6).all(dim=1).sum().item()
+            correct_predictions += (angle_diff < ACCURACY_THRESHOLD).all(dim=1).sum().item()
         
         avg_loss = total_loss / len(train_loader)
         accuracy = 100 * correct_predictions / total_samples
@@ -49,7 +50,7 @@ def train_model(model, train_loader, test_loader, epochs=100, lr=0.001):
                     test_loss += criterion(outputs, targets).item()
                     test_samples += targets.size(0)
                     angle_diff = torch.abs(outputs - targets)
-                    test_correct += (angle_diff < 1e-6).all(dim=1).sum().item()
+                    test_correct += (angle_diff < ACCURACY_THRESHOLD).all(dim=1).sum().item()
             test_avg_loss = test_loss / len(test_loader)
             test_accuracy = 100 * test_correct / test_samples
             print(f"Epoch {epoch+1}/{epochs}, Train Loss: {avg_loss:.6f}, Train Acc: {accuracy:.2f}%, Test Loss: {test_avg_loss:.6f}, Test Acc: {test_accuracy:.2f}%")

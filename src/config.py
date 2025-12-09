@@ -31,6 +31,9 @@ TEST_SPLIT = 0.2
 RRR_SEED = 42
 RRRRRR_SEED = 123
 
+# Accuracy Threshold (from DLS precision level, epsilon=1e-6)
+ACCURACY_THRESHOLD = 1e-6
+
 # Dataset Generation Flags
 GENERATE_RRR_DATASET = False
 GENERATE_RRRRRR_DATASET = False
