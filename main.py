@@ -10,8 +10,8 @@ from torch.utils.data import TensorDataset, DataLoader, random_split
 
 from src.config import RRR_dh, RRRRRR_dh, NUM_SAMPLES, ANGLE_MIN, ANGLE_MAX, RRR_SEED, RRRRRR_SEED, TEST_SPLIT, GENERATE_RRR_DATASET, GENERATE_RRRRRR_DATASET
 from src.robots import forward_kinematics, inverse_kinematics_3dof_rrr, deg_to_rad_dh
-from src.training import generate_consistent_dataset, save_dataset, load_dataset, train_model, train_tejomurt_model
-from src.models import RRR_Linear, TejomurtKak_Model, Simple4Layer
+from src.training import generate_consistent_dataset, save_dataset, load_dataset, train_model
+from src.models import Simple4Layer
 from src.evaluation import evaluate_model
 
 def main():
@@ -82,34 +82,16 @@ def main():
     test_loader = DataLoader(rrr_test, batch_size=64, shuffle=False)
     
     print("\n" + "="*60)
-    print("Training RRR_Linear model (Deep Network with Huber Loss)")
+    print("Training Simple4Layer Model for RRR Robot")
     print("="*60)
-    model1 = RRR_Linear(input_size=15)
-    model1 = train_model(model1, train_loader, test_loader, output_mean, output_std, epochs=100, lr=0.001)
-    
-    print("\nEvaluating RRR_Linear model...")
-    evaluate_model(model1, test_loader, output_mean, output_std)
-    
-    print("\n" + "="*60)
-    print("Training Simple4Layer Model (4 Fully Connected Layers)")
-    print("="*60)
-    model_simple = Simple4Layer(input_size=15)
-    model_simple = train_model(model_simple, train_loader, test_loader, output_mean, output_std, epochs=100, lr=0.001)
+    model = Simple4Layer(input_size=15)
+    model = train_model(model, train_loader, test_loader, output_mean, output_std, epochs=100, lr=0.001)
     
     print("\nEvaluating Simple4Layer model...")
-    evaluate_model(model_simple, test_loader, output_mean, output_std)
+    evaluate_model(model, test_loader, output_mean, output_std)
     
     print("\n" + "="*60)
-    print("Training TejomurtKak_Model (Structured Network from Paper)")
-    print("="*60)
-    model2 = TejomurtKak_Model(input_size=15)
-    model2 = train_tejomurt_model(model2, train_loader, test_loader, output_mean, output_std, epochs=100, lr=0.01)
-    
-    print("\nEvaluating TejomurtKak_Model...")
-    evaluate_model(model2, test_loader, output_mean, output_std)
-    
-    print("\n" + "="*60)
-    print("Speed Comparison")
+    print("Speed Comparison: Classical IK vs Neural Network")
     print("="*60)
     dh_rad = deg_to_rad_dh(RRR_dh)
     
@@ -119,6 +101,7 @@ def main():
     
     homo = forward_kinematics(dh_rad, test_angles)
     
+    # Classical geometric IK
     start_geom = time.time()
     for _ in range(100):
         angles_geom = inverse_kinematics_3dof_rrr(dh_rad, homo)
@@ -126,35 +109,19 @@ def main():
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    model1.eval()
+    # Neural network IK
+    model.eval()
     with torch.no_grad():
         test_input = test_sample[0].unsqueeze(0).to(device)
-        start_nn1 = time.time()
+        start_nn = time.time()
         for _ in range(100):
-            angles_nn1 = model1(test_input)
-        time_nn1 = (time.time() - start_nn1) / 100
-    
-    model_simple.eval()
-    with torch.no_grad():
-        test_input = test_sample[0].unsqueeze(0).to(device)
-        start_nn_simple = time.time()
-        for _ in range(100):
-            angles_nn_simple = model_simple(test_input)
-        time_nn_simple = (time.time() - start_nn_simple) / 100
-    
-    model2.eval()
-    with torch.no_grad():
-        test_input = test_sample[0].unsqueeze(0).to(device)
-        start_nn2 = time.time()
-        for _ in range(100):
-            angles_nn2 = model2(test_input)
-        time_nn2 = (time.time() - start_nn2) / 100
+            angles_nn = model(test_input)
+        time_nn = (time.time() - start_nn) / 100
     
     print(f"\nAverage over 100 runs:")
-    print(f"Geometric IK: {time_geom*1000:.4f} ms")
-    print(f"RRR_Linear (Deep): {time_nn1*1000:.4f} ms (Speedup: {time_geom/time_nn1:.2f}x)")
-    print(f"Simple4Layer: {time_nn_simple*1000:.4f} ms (Speedup: {time_geom/time_nn_simple:.2f}x)")
-    print(f"TejomurtKak (Structured): {time_nn2*1000:.4f} ms (Speedup: {time_geom/time_nn2:.2f}x)")
+    print(f"Classical Geometric IK: {time_geom*1000:.4f} ms")
+    print(f"Neural Network IK: {time_nn*1000:.4f} ms")
+    print(f"Speedup: {time_geom/time_nn:.2f}x faster")
 
 if __name__ == "__main__":
     main()

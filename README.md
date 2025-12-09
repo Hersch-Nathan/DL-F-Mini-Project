@@ -6,3 +6,9 @@ This repo is a mini project for my Deep Learning Fundamentals Course. For my pro
 
 
 D-H perameters
+
+1) show classical way of solving
+2) show issue of 1st attemp with just a rnadomized dataset
+3) show solution
+4) show rrr simple model
+5) show rrrrrr comple model 
