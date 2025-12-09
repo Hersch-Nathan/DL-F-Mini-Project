@@ -85,12 +85,16 @@ class TejomurtKak_Model(nn.Module):
         return x
 
 def train_model(model, train_loader, test_loader, output_mean, output_std, epochs=100, lr=0.001):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Training on device: {device}")
+    model = model.to(device)
+    
     criterion = nn.HuberLoss(delta=1.0)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10)
     
-    output_mean_t = torch.tensor(output_mean, dtype=torch.float32)
-    output_std_t = torch.tensor(output_std, dtype=torch.float32)
+    output_mean_t = torch.tensor(output_mean, dtype=torch.float32).to(device)
+    output_std_t = torch.tensor(output_std, dtype=torch.float32).to(device)
     
     best_test_loss = float('inf')
     patience = 20
@@ -103,6 +107,7 @@ def train_model(model, train_loader, test_loader, output_mean, output_std, epoch
         correct_predictions = 0
         
         for inputs, targets in train_loader:
+            inputs, targets = inputs.to(device), targets.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, targets)
@@ -127,6 +132,7 @@ def train_model(model, train_loader, test_loader, output_mean, output_std, epoch
             test_correct = 0
             with torch.no_grad():
                 for inputs, targets in test_loader:
+                    inputs, targets = inputs.to(device), targets.to(device)
                     outputs = model(inputs)
                     test_loss += criterion(outputs, targets).item()
                     test_samples += targets.size(0)
@@ -152,6 +158,7 @@ def train_model(model, train_loader, test_loader, output_mean, output_std, epoch
     return model
 
 def evaluate_model(model, test_loader, output_mean, output_std):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.eval()
     criterion = nn.HuberLoss(delta=1.0)
     total_loss = 0
@@ -159,11 +166,12 @@ def evaluate_model(model, test_loader, output_mean, output_std):
     correct_predictions_strict = 0
     correct_predictions_relaxed = 0
     
-    output_mean_t = torch.tensor(output_mean, dtype=torch.float32)
-    output_std_t = torch.tensor(output_std, dtype=torch.float32)
+    output_mean_t = torch.tensor(output_mean, dtype=torch.float32).to(device)
+    output_std_t = torch.tensor(output_std, dtype=torch.float32).to(device)
     
     with torch.no_grad():
         for inputs, targets in test_loader:
+            inputs, targets = inputs.to(device), targets.to(device)
             outputs = model(inputs)
             loss = criterion(outputs, targets)
             total_loss += loss.item()
@@ -184,12 +192,16 @@ def evaluate_model(model, test_loader, output_mean, output_std):
     return avg_loss
 
 def train_tejomurt_model(model, train_loader, test_loader, output_mean, output_std, epochs=100, lr=0.01):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Training on device: {device}")
+    model = model.to(device)
+    
     criterion = nn.MSELoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.5)
     
-    output_mean_t = torch.tensor(output_mean, dtype=torch.float32)
-    output_std_t = torch.tensor(output_std, dtype=torch.float32)
+    output_mean_t = torch.tensor(output_mean, dtype=torch.float32).to(device)
+    output_std_t = torch.tensor(output_std, dtype=torch.float32).to(device)
     
     for epoch in range(epochs):
         model.train()
@@ -198,6 +210,7 @@ def train_tejomurt_model(model, train_loader, test_loader, output_mean, output_s
         correct_predictions = 0
         
         for inputs, targets in train_loader:
+            inputs, targets = inputs.to(device), targets.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, targets)
@@ -221,6 +234,7 @@ def train_tejomurt_model(model, train_loader, test_loader, output_mean, output_s
             test_correct = 0
             with torch.no_grad():
                 for inputs, targets in test_loader:
+                    inputs, targets = inputs.to(device), targets.to(device)
                     outputs = model(inputs)
                     test_loss += criterion(outputs, targets).item()
                     test_samples += targets.size(0)

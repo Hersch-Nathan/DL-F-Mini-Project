@@ -115,9 +115,11 @@ def main():
         angles_geom = inverse_kinematics_3dof_rrr(dh_rad, homo)
     time_geom = (time.time() - start_geom) / 100
     
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
     model1.eval()
     with torch.no_grad():
-        test_input = test_sample[0].unsqueeze(0)
+        test_input = test_sample[0].unsqueeze(0).to(device)
         start_nn1 = time.time()
         for _ in range(100):
             angles_nn1 = model1(test_input)
@@ -125,7 +127,7 @@ def main():
     
     model2.eval()
     with torch.no_grad():
-        test_input = test_sample[0].unsqueeze(0)
+        test_input = test_sample[0].unsqueeze(0).to(device)
         start_nn2 = time.time()
         for _ in range(100):
             angles_nn2 = model2(test_input)
