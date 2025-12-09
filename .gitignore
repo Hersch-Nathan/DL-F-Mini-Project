@@ -1,5 +1,6 @@
 # venv
-*
+.venv
+data
 # Mac 
 .DS_Store
 
